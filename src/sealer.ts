@@ -23,6 +23,41 @@ export default class Sealer {
     this.database.insert
   }
 
+  public async seal(flagsAndArgs: FlagsAndArgs, message: Message): Promise<void> {
+    const [title, content] = flagsAndArgs.args;
+
+    if (title.length > 20) {
+      logClientError(message, 'Title length exceeds 20 characters');
+      return;
+    }
+
+    // Ensure the author doesn't already own an envelope with the same name
+    try {
+      const envelope = await this.getFirstMatch(message.author.id, title);
+      if (envelope) {
+        logClientError(
+          message, `Envelope with title "${title}" already exists`);
+        return;
+      }
+    } catch (err) {
+      logClientError(message, 'Error while accessing database');
+      logError(err);
+      return;
+    }
+
+    try {
+      await this.database.insert({
+        author: message.author.id,
+        title: title,
+        content: content,
+        time: new Date(),
+      });
+    } catch(err) {
+      logClientError(message, 'Unable to write envelope to database');
+      logError(err);
+    }
+  }
+
   public async unseal(flagsAndArgs: FlagsAndArgs, message: Message): Promise<void> {
     const title = flagsAndArgs.args[0];
 
