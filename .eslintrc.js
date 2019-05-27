@@ -3,6 +3,8 @@ module.exports = {
   plugins: ['@typescript-eslint'],
   extends: ['plugin:@typescript-eslint/recommended'],
   rules: {
-    '@typescript-eslint/no-parameter-properties': 'off'
+    '@typescript-eslint/no-parameter-properties': 'off',
+    'indent': 'off',
+    '@typescript-eslint/indent': ['error', 2]
   },
 }

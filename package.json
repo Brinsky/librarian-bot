@@ -4,7 +4,7 @@
   "description": "A simple Discord bot for book club",
   "main": "index.js",
   "scripts": {
-    "lint": "eslint .",
+    "lint": "eslint",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "author": "",

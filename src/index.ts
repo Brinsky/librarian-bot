@@ -1,32 +1,48 @@
 import {Client} from 'discord.js'
 import config from './config.json'
 import {lex} from './lexer'
+import {logClientError} from './error'
+import {CommandSpec, parseCommand} from './command'
+import {emojify} from './emojifier'
+
+const COMMANDS: ReadonlyMap<string, CommandSpec> = new Map([
+  ['emojify', new CommandSpec(emojify)],
+]);
 
 const client = new Client();
 
 /////////// Event-handling code ///////////
 
 client.on('ready', (): void => {
-    console.log('I am ready!');
+  console.log('I am ready!');
 });
 
 client.on('message', (message): void => {
-    let text = message.content;
+  let text = message.content;
 
-    // Only process commands with the appropriate prefix
-    if (!text.startsWith(config.prefix)) {
-        return;
-    }
+  // Only process commands with the appropriate prefix
+  if (!text.startsWith(config.prefix)) {
+    return;
+  }
 
-    // Process the text using the lexer
-    text = text.slice(config.prefix.length);
-    let tokens = lex(text);
-    const command = tokens[0].text;
-    tokens = tokens.slice(1);
+  // Process the text using the lexer
+  text = text.slice(config.prefix.length);
+  let tokens = lex(text);
+  if (tokens.length === 0) {
+    logClientError(message, 'No command provided');
+    return;
+  }
 
-    console.log('Command: ' + command);
-    console.log(tokens);
+  // Look up the requested command
+  const commandText = tokens[0].text;
+  tokens = tokens.slice(1); // Discard the command name token
+  const commandSpec = COMMANDS.get(commandText);
+  if (!commandSpec) {
+    logClientError(message, 'Unrecognized command "' + commandText + '"');
+    return;
+  }
 
+  commandSpec.command(parseCommand(commandSpec, tokens), message, client);
 });
 
 // Print error events to stderr
