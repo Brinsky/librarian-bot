@@ -2,14 +2,20 @@ import {Client} from 'discord.js'
 import config from './config.json'
 import {lex} from './lexer'
 import {logClientError} from './error'
-import {CommandSpec, parseCommand} from './command'
+import {Command, CommandSpec, parseCommand} from './command'
 import {emojify} from './emojifier'
+import Sealer from './sealer'
+
+const client = new Client();
+const sealer = new Sealer();
+
+// Hijinks needed to preserve correct 'this'
+const unseal: Command = (f, m): Promise<void> => sealer.unseal(f, m);
 
 const COMMANDS: ReadonlyMap<string, CommandSpec> = new Map([
   ['emojify', new CommandSpec(emojify)],
+  ['unseal', new CommandSpec(unseal)],
 ]);
-
-const client = new Client();
 
 /////////// Event-handling code ///////////
 

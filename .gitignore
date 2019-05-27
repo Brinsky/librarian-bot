@@ -2,3 +2,4 @@ src/config.json
 build/
 node_modules/
 nohup.out
+data/

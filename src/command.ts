@@ -12,7 +12,7 @@ export class FlagsAndArgs {
 }
 
 export interface Command {
-  (flagsAndArgs: FlagsAndArgs, message: Message, client?: Client): void;
+  (flagsAndArgs: FlagsAndArgs, message: Message, client?: Client): void|Promise<void>;
 }
 
 export class CommandSpec {
