@@ -13,8 +13,8 @@ const sealer = new Sealer();
 const unseal: Command = (f, m): Promise<void> => sealer.unseal(f, m);
 
 const COMMANDS: ReadonlyMap<string, CommandSpec> = new Map([
-  ['emojify', new CommandSpec(emojify)],
-  ['unseal', new CommandSpec(unseal)],
+  ['emojify', new CommandSpec(emojify, [], 1)],
+  ['unseal', new CommandSpec(unseal, [], 1, 1)],
 ]);
 
 /////////// Event-handling code ///////////
@@ -48,7 +48,11 @@ client.on('message', (message): void => {
     return;
   }
 
-  commandSpec.command(parseCommand(commandSpec, tokens), message, client);
+  try {
+    commandSpec.command(parseCommand(commandSpec, tokens), message, client);
+  } catch (err) {
+    logClientError(message, err.message);
+  }
 });
 
 // Print error events to stderr

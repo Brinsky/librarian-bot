@@ -24,12 +24,6 @@ export default class Sealer {
   }
 
   public async unseal(flagsAndArgs: FlagsAndArgs, message: Message): Promise<void> {
-    if (flagsAndArgs.args.length < 1) {
-      logClientError(message, 'Missing argument');
-      return;
-    } else if (flagsAndArgs.args.length > 1) {
-      logError('Ignoring extra arguments');
-    }
     const title = flagsAndArgs.args[0];
 
     let envelope: Envelope|null;
