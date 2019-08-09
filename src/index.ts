@@ -59,6 +59,8 @@ client.on('message', (message): void => {
 
 // Print error events to stderr
 client.on('error', console.error);
+process.on('uncaughtException', console.error);
+process.on('unhandledRejection', console.error);
 
 /////////// Startup code ///////////
 
