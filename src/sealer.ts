@@ -124,7 +124,7 @@ export default class Sealer {
       voteText.push(` - "${envelopes[i].title}" from ${users[i]}`);
     }
     voteText.push('');
-    voteText.push(`React with ${APPROVE_REACT} to approve the unsealing`
+    voteText.push(`React with ${APPROVE_REACT} to approve the unsealing `
       + 'of your envelope. Unsealing will occur only if all users '
       + 'approve within the next hour.');
     const voteMessage =
