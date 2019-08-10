@@ -12,11 +12,13 @@ const sealer = new Sealer();
 // Hijinks needed to preserve correct 'this'
 const seal: Command = (f, m): Promise<void> => sealer.seal(f, m);
 const unseal: Command = (f, m): Promise<void> => sealer.unseal(f, m);
+const vote: Command = (f, m, c): Promise<void> => sealer.vote(f, m, c);
 
 const COMMANDS: ReadonlyMap<string, CommandSpec> = new Map([
   ['emojify', new CommandSpec(emojify, [], 1)],
   ['seal', new CommandSpec(seal, [], 2, 2)],
   ['unseal', new CommandSpec(unseal, [], 1, 1)],
+  ['vote', new CommandSpec(vote, [], 1, -1)],
 ]);
 
 /////////// Event-handling code ///////////

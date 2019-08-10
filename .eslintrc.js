@@ -5,6 +5,7 @@ module.exports = {
   rules: {
     '@typescript-eslint/no-parameter-properties': 'off',
     'indent': 'off',
-    '@typescript-eslint/indent': ['error', 2]
+    '@typescript-eslint/indent': ['error', 2],
+    'max-len': ['error', {'code': 80}]
   },
 }
