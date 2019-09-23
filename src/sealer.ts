@@ -92,6 +92,7 @@ export default class Sealer {
     message: Message,
     client: Client): Promise<void> {
     const users: User[] = [];
+    const userIdSet: Set<string> = new Set();
     const envelopes: Envelope[] = [];
 
     for(const tag of flagsAndArgs.args) {
@@ -111,6 +112,14 @@ export default class Sealer {
         logClientError(message, `Failed to find user with ID ${id}`);
         logError(err);
         return;
+      }
+
+      // Ensure each user is specified only once
+      if (userIdSet.has(id)) {
+        logClientError(
+          message, `User ${users[users.length - 1]} listed more than once`);
+      } else {
+        userIdSet.add(id);
       }
       
       // Gather the latest envelope from each specified user
@@ -145,7 +154,6 @@ export default class Sealer {
     await voteMessage.react(APPROVE_REACT);
 
     // Wait for reacts and then process them
-    const userIdSet = new Set(flagsAndArgs.args);
     const filter = (reaction: MessageReaction, user: User): boolean => {
       return reaction.emoji.name === APPROVE_REACT && userIdSet.has(user.id);
     };
