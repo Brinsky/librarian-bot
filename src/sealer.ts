@@ -1,7 +1,7 @@
 import Datastore from 'nedb-promises'
 import {Client, Message, MessageReaction, User} from 'discord.js'
 import {FlagsAndArgs} from './command'
-import {logError, logClientError} from './error'
+import {indicateSuccess, logError, logClientError} from './error'
 import {shuffle} from './util'
 
 interface Envelope {
@@ -12,7 +12,8 @@ interface Envelope {
 }
 
 const HOUR_MS = 60 * 60 * 1000;
-const APPROVE_REACT = '\u2705';
+const APPROVE_REACT = '\u2611'; // "Ballot box with check emoji"
+const TAG_PATTERN = /<@(\d+)>/;
 
 /** Performs creation and management of sealed envelopes. */
 export default class Sealer {
@@ -57,6 +58,7 @@ export default class Sealer {
         content: content,
         time: new Date(),
       });
+      indicateSuccess(message);
     } catch(err) {
       logClientError(message, 'Unable to write envelope to database');
       logError(err);
@@ -92,7 +94,16 @@ export default class Sealer {
     const users: User[] = [];
     const envelopes: Envelope[] = [];
 
-    for(const id of flagsAndArgs.args) {
+    for(const tag of flagsAndArgs.args) {
+      // Validate @ tag and extract user ID
+      const match = tag.match(TAG_PATTERN);
+      if (match === null || match.length !== 2) { 
+        logClientError(
+          message, `Unrecognized argument ${tag}. Expect an @ tag`);
+        return;
+      }
+      const id = match[1];
+
       // Ensure each ID corresponds to a real user
       try {
         users.push(await client.fetchUser(id));
@@ -127,8 +138,11 @@ export default class Sealer {
     voteText.push(`React with ${APPROVE_REACT} to approve the unsealing `
       + 'of your envelope. Unsealing will occur only if all users '
       + 'approve within the next hour.');
+    voteText.push('');
+    voteText.push(`I will also react with ${APPROVE_REACT} for convenience.`);
     const voteMessage =
       await message.channel.send(voteText.join('\n')) as Message;
+    await voteMessage.react(APPROVE_REACT);
 
     // Wait for reacts and then process them
     const userIdSet = new Set(flagsAndArgs.args);
@@ -137,7 +151,7 @@ export default class Sealer {
     };
 
     voteMessage.awaitReactions(filter, { max: users.length, time: HOUR_MS })
-      .then(collected => {
+      .then((collected): void => {
         if (collected.size === 0 || collected.first().count < users.length) {
           throw collected;
         }
@@ -153,11 +167,12 @@ export default class Sealer {
               + `\n${envelope.content}`);
         }
       })
-      .catch(collected => {
+      .catch((collected): void => {
         const count = collected.size > 0 ? collected.first().count : 0;
         logClientError(
           message, 
-          `Only received ${count} out of ${users.length} responses after X`);
+          `Only received ${count} out of ${users.length} responses after `
+          + `one hour`);
       });
   }
 

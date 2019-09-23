@@ -25,4 +25,3 @@ export function shuffle<T>(array: T[]): void {
     array[j] = temp;
   }
 }
-
