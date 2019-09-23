@@ -12,7 +12,7 @@
   "dependencies": {
     "discord.js": "^11.5.1",
     "nedb-promises": "^3.0.7",
-    "typescript": "^3.5.3"
+    "typescript": "^3.6.3"
   },
   "devDependencies": {
     "@types/node": "^12.7.1",
