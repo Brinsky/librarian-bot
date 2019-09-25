@@ -5,6 +5,7 @@ import {logClientError} from './error'
 import {CommandSpec, parseCommand} from './command'
 import {emojify} from './emojifier'
 import Sealer from './sealer'
+import {picker} from './picker'
 
 const client = new Client();
 const sealer = new Sealer();
@@ -14,6 +15,7 @@ const COMMANDS: ReadonlyMap<string, CommandSpec> = new Map([
   ['seal', new CommandSpec(sealer.seal.bind(sealer), [], 2, 2)],
   ['unseal', new CommandSpec(sealer.unseal.bind(sealer), [], 1, 1)],
   ['vote', new CommandSpec(sealer.vote.bind(sealer), [], 1, -1)],
+  ['picker', new CommandSpec(picker, [], 1, -1)],
 ]);
 
 /////////// Event-handling code ///////////
