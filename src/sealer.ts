@@ -2,7 +2,7 @@ import Datastore from 'nedb-promises'
 import {Client, Message, MessageReaction, User} from 'discord.js'
 import {FlagsAndArgs} from './command'
 import {indicateSuccess, logError, logClientError} from './error'
-import {shuffle} from './util'
+import {assertNonNull, shuffle} from './util'
 
 interface Envelope {
   readonly author: string;
@@ -39,7 +39,8 @@ export default class Sealer {
 
     // Ensure the author doesn't already own an envelope with the same name
     try {
-      const envelope = await this.getFirstMatch(message.author.id, title);
+      const envelope =
+          await this.getFirstMatch(assertNonNull(message.author).id, title);
       if (envelope) {
         logClientError(
           message, `Envelope with title "${title}" already exists`);
@@ -53,7 +54,7 @@ export default class Sealer {
 
     try {
       await this.database.insert({
-        author: message.author.id,
+        author: assertNonNull(message.author).id,
         title: title,
         content: content,
         time: new Date(),
@@ -71,7 +72,8 @@ export default class Sealer {
 
     let envelope: Envelope|null;
     try {
-      envelope = await this.getFirstMatch(message.author.id, title);
+      envelope = 
+          await this.getFirstMatch(assertNonNull(message.author).id, title);
     } catch (err) {
       logClientError(message, 'Error while accessing database');
       logError(err);
@@ -107,7 +109,7 @@ export default class Sealer {
 
       // Ensure each ID corresponds to a real user
       try {
-        users.push(await client.fetchUser(id));
+        users.push(await client.users.fetch(id));
       } catch(err) {
         logClientError(message, `Failed to find user with ID ${id}`);
         logError(err);
@@ -160,8 +162,16 @@ export default class Sealer {
 
     voteMessage.awaitReactions(filter, { max: users.length, time: HOUR_MS })
       .then((collected): void => {
-        if (collected.size === 0 || collected.first().count < users.length) {
-          throw collected;
+        {
+          const reaction = collected.first();
+          const count = reaction != null ? reaction.count : 0;
+          if (count < users.length) {
+            logClientError(
+              message, 
+              `Only received ${count} out of ${users.length} responses after `
+              + `one hour`);
+            return;
+          }
         }
 
         // Randomize the order of the indices we plan to access
@@ -174,13 +184,6 @@ export default class Sealer {
               + `${users[indices[i]]} on ${envelope.time}:`
               + `\n${envelope.content}`);
         }
-      })
-      .catch((collected): void => {
-        const count = collected.size > 0 ? collected.first().count : 0;
-        logClientError(
-          message, 
-          `Only received ${count} out of ${users.length} responses after `
-          + `one hour`);
       });
   }
 

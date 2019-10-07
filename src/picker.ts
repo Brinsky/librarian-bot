@@ -5,7 +5,8 @@ import {randomInt} from './util'
 
 const TAG_PATTERN = /<@(\d+)>/;
 
-export async function picker(flagsAndArgs: FlagsAndArgs, message: Message, client: Client): Promise<void> {
+export async function picker(flagsAndArgs: FlagsAndArgs, message: Message,
+  client: Client): Promise<void> {
   const users: User[] = [];
 
   for(const tag of flagsAndArgs.args) {
@@ -20,7 +21,7 @@ export async function picker(flagsAndArgs: FlagsAndArgs, message: Message, clien
 
     // Ensure each ID corresponds to a real user
     try {
-      users.push(await client.fetchUser(id));
+      users.push(await client.users.fetch(id));
     } catch(err) {
       logClientError(message, `Failed to find user with ID ${id}`);
       logError(err);

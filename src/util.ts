@@ -25,3 +25,15 @@ export function shuffle<T>(array: T[]): void {
     array[j] = temp;
   }
 }
+
+/**
+ * Returns the given object unmodified if the object is neither undefined nor
+ * null. Otherwise, throws an error.
+ */
+export function assertNonNull<T>(t: T|null): T {
+  if (t !== null) {
+    return t;
+  } else {
+    throw new Error(`Failed to assert object was non-null: object is {$t}`);
+  }
+}
