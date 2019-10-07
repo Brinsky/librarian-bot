@@ -145,29 +145,37 @@ export default class Sealer {
       return reaction.emoji.name === APPROVE_REACT && userIdSet.has(user.id);
     };
 
-    voteMessage.awaitReactions(filter, { max: users.length, time: HOUR_MS })
-      .then((collected): void => {
-        {
-          const reaction = collected.first();
-          const count = reaction != null ? reaction.count : 0;
-          if (count < users.length) {
-            throw new ClientError(
-              `Only received ${count} out of ${users.length} responses after `
-              + `one hour`);
-          }
-        }
+    const collector = voteMessage
+      .createReactionCollector(filter, { max: users.length, time: HOUR_MS });
 
-        // Randomize the order of the indices we plan to access
-        const indices = [...Array(users.length).keys()];
-        shuffle(indices);
+    // Presumably no events will be triggered by the collector after 'end'
+    // has been triggered
+    await new Promise((resolve): void => {
+      collector.on('end', (): void => {
+        resolve();
+      })
+    });
 
-        for(let i = 0; i < users.length; i++) {
-          const envelope = envelopes[indices[i]];
-          message.channel.send(`Unsealing "${envelope.title}" from `
-              + `${users[indices[i]]} on ${envelope.time}:`
-              + `\n${envelope.content}`);
-        }
-      });
+    {
+      const reaction = collector.collected.first();
+      const count = reaction != null ? reaction.count : 0;
+      if (count < users.length) {
+        throw new ClientError(
+          `Only received ${count} out of ${users.length} responses after `
+          + `one hour`);
+      }
+    }
+
+    // Randomize the order of the indices we plan to access
+    const indices = [...Array(users.length).keys()];
+    shuffle(indices);
+
+    for(let i = 0; i < users.length; i++) {
+      const envelope = envelopes[indices[i]];
+      message.channel.send(`Unsealing "${envelope.title}" from `
+          + `${users[indices[i]]} on ${envelope.time}:`
+          + `\n${envelope.content}`);
+    }
   }
 
   private async getFirstMatch(
