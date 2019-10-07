@@ -1,6 +1,5 @@
 import {Message} from 'discord.js'
 import {FlagsAndArgs} from './command'
-import {logError} from './error'
 
 const EMOJI_MAP: ReadonlyMap<string, string> = new Map([
   ['a', '\ud83c\udde6'],
@@ -61,9 +60,10 @@ function emojifyText(text: string): string {
   return emojified.join('\u200b');
 }
 
-export function emojify(flagsAndArgs: FlagsAndArgs, message: Message): void {
+export async function emojify(
+  flagsAndArgs: FlagsAndArgs, message: Message): Promise<void> {
   const args = flagsAndArgs.args;
   for (let i = 0; i < args.length; i++) {
-    message.channel.send(emojifyText(args[i])).catch(logError);
+    message.channel.send(emojifyText(args[i]));
   }
 }

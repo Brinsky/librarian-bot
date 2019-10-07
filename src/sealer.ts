@@ -1,7 +1,7 @@
 import Datastore from 'nedb-promises'
 import {Client, Message, MessageReaction, User} from 'discord.js'
 import {FlagsAndArgs} from './command'
-import {indicateSuccess, logError, logClientError} from './error'
+import {ClientError, indicateSuccess} from './error'
 import {assertNonNull, shuffle} from './util'
 
 interface Envelope {
@@ -33,23 +33,19 @@ export default class Sealer {
     const [title, content] = flagsAndArgs.args;
 
     if (title.length > 20) {
-      logClientError(message, 'Title length exceeds 20 characters');
-      return;
+      throw new ClientError('Title length exceeds 20 characters');
     }
 
     // Ensure the author doesn't already own an envelope with the same name
+    let envelope: Envelope|null;
     try {
-      const envelope =
+      envelope =
           await this.getFirstMatch(assertNonNull(message.author).id, title);
-      if (envelope) {
-        logClientError(
-          message, `Envelope with title "${title}" already exists`);
-        return;
-      }
     } catch (err) {
-      logClientError(message, 'Error while accessing database');
-      logError(err);
-      return;
+      throw new ClientError('Error while accessing database', err);
+    }
+    if (envelope) {
+      throw new ClientError(`Envelope with title "${title}" already exists`);
     }
 
     try {
@@ -61,8 +57,7 @@ export default class Sealer {
       });
       indicateSuccess(message);
     } catch(err) {
-      logClientError(message, 'Unable to write envelope to database');
-      logError(err);
+      throw new ClientError('Unable to write envelope to database', err);
     }
   }
 
@@ -75,17 +70,14 @@ export default class Sealer {
       envelope = 
           await this.getFirstMatch(assertNonNull(message.author).id, title);
     } catch (err) {
-      logClientError(message, 'Error while accessing database');
-      logError(err);
-      return;
+      throw new ClientError('Error while accessing database', err);
     }
 
     if (envelope) {
       message.channel.send(`Unsealing "${envelope.title}" from `
           + `${envelope.time}:\n${envelope.content}`);
     } else {
-      logClientError(
-        message, `No envelope found with title "${title}"`);
+      throw new ClientError(`No envelope found with title "${title}"`);
     }
   }
 
@@ -101,9 +93,7 @@ export default class Sealer {
       // Validate @ tag and extract user ID
       const match = tag.match(TAG_PATTERN);
       if (match === null || match.length !== 2) { 
-        logClientError(
-          message, `Unrecognized argument ${tag}. Expect an @ tag`);
-        return;
+        throw new ClientError(`Unrecognized argument ${tag}. Expect an @ tag`);
       }
       const id = match[1];
 
@@ -111,15 +101,13 @@ export default class Sealer {
       try {
         users.push(await client.users.fetch(id));
       } catch(err) {
-        logClientError(message, `Failed to find user with ID ${id}`);
-        logError(err);
-        return;
+        throw new ClientError(`Failed to find user with ID ${id}`, err);
       }
 
       // Ensure each user is specified only once
       if (userIdSet.has(id)) {
-        logClientError(
-          message, `User ${users[users.length - 1]} listed more than once`);
+        throw new ClientError(
+          `User ${users[users.length - 1]} listed more than once`);
       } else {
         userIdSet.add(id);
       }
@@ -129,14 +117,11 @@ export default class Sealer {
         const userEnvelopes = await this.database
           .find<Envelope>({ author: id }).sort({ time: -1 }).limit(1);
         if (userEnvelopes.length === 0) {
-          logClientError(message, `User with ID ${id} has no envelopes`);
-          return;
+          throw new ClientError(`User with ID ${id} has no envelopes`);
         }
         envelopes.push(userEnvelopes[0]);
       } catch (err) {
-        logClientError(message, 'Error while accessing database');
-        logError(err);
-        return;
+        throw new ClientError('Error while accessing database', err);
       }
     }
 
@@ -166,11 +151,9 @@ export default class Sealer {
           const reaction = collected.first();
           const count = reaction != null ? reaction.count : 0;
           if (count < users.length) {
-            logClientError(
-              message, 
+            throw new ClientError(
               `Only received ${count} out of ${users.length} responses after `
               + `one hour`);
-            return;
           }
         }
 

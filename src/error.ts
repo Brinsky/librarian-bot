@@ -16,3 +16,13 @@ export function logClientError(message: Message, error: string): void {
 export function indicateSuccess(message: Message): void {
   message.react(EMOJI_SUCCESS).catch(logError);
 }
+
+/**
+ * Subclass of Error used to indicate that the error message should be
+ * user-visible.
+ */
+export class ClientError extends Error {
+  public constructor(message: string, readonly internalMessage?: string) {
+    super(message);
+  }
+};

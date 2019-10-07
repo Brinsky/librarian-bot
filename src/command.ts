@@ -13,7 +13,7 @@ export class FlagsAndArgs {
 }
 
 export interface Command {
-  (flagsAndArgs: FlagsAndArgs, message: Message, client: Client): void|Promise<void>;
+  (flagsAndArgs: FlagsAndArgs, message: Message, client: Client): Promise<void>;
 }
 
 export class CommandSpec {
@@ -36,7 +36,8 @@ export class CommandSpec {
   }
 }
 
-export function parseCommand(command: CommandSpec, tokens: Token[]): FlagsAndArgs {
+export function parseCommand(
+  command: CommandSpec, tokens: Token[]): FlagsAndArgs {
   const flags: Map<string, string|null> = new Map();
   const freeArgs: string[] = []; // Args that come after all flags
   let seenFreeArg = false;

@@ -1,7 +1,7 @@
 import {Client} from 'discord.js'
 import config from './config.json'
 import {lex} from './lexer'
-import {logClientError} from './error'
+import {ClientError, logClientError, logError} from './error'
 import {CommandSpec, parseCommand} from './command'
 import {emojify} from './emojifier'
 import Sealer from './sealer'
@@ -24,7 +24,7 @@ client.on('ready', (): void => {
   console.log('I am ready!');
 });
 
-client.on('message', (message): void => {
+client.on('message', async (message): Promise<void> => {
   let text = message.content;
 
   // Only process commands with the appropriate prefix
@@ -50,9 +50,19 @@ client.on('message', (message): void => {
   }
 
   try {
-    commandSpec.command(parseCommand(commandSpec, tokens), message, client);
+    await commandSpec.command(
+      parseCommand(commandSpec, tokens), message, client);
   } catch (err) {
-    logClientError(message, err.message);
+    if (err instanceof ClientError) {
+      logClientError(message, err.message);
+      if (err.internalMessage != null) {
+        logError(err.internalMessage);
+      }
+    } else {
+      logClientError(
+        message, 'Failed to execute command due to an internal error');
+      logError(err);
+    }
   }
 });
 
