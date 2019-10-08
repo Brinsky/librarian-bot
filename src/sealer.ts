@@ -1,8 +1,8 @@
 import Datastore from 'nedb-promises'
-import {Client, Message, MessageReaction, User} from 'discord.js'
+import {Client, Collector, Message, MessageReaction, User} from 'discord.js'
 import {FlagsAndArgs} from './command'
 import {ClientError, indicateSuccess} from './error'
-import {assertNonNull, shuffle} from './util'
+import {assertNonNull, fetchUsers, mentionToId, shuffle} from './util'
 
 interface Envelope {
   readonly author: string;
@@ -12,8 +12,52 @@ interface Envelope {
 }
 
 const HOUR_MS = 60 * 60 * 1000;
+const THIRTY_SEC_MS = 30 * 1000;
 const APPROVE_REACT = '\u2611'; // "Ballot box with check emoji"
-const TAG_PATTERN = /<@(\d+)>/;
+const CANCEL_REACT = '\uD83D\uDEAB'; // "No entry sign emoji"
+
+function awaitCollectorEnd<K, V>(collector: Collector<K, V>): Promise<void> {
+  return new Promise((resolve): void => {
+    collector.on('end', (): void => {
+      resolve();
+    });
+  });
+}
+
+function createFilter(
+  emojiName: string, 
+  userIds: Set<string>): (r: MessageReaction, u: User) => boolean {
+  return (reaction: MessageReaction, user: User): boolean => {
+    return reaction.emoji.name === emojiName && userIds.has(user.id);
+  };
+}
+
+function buildVoteMessage(
+  users: User[], envelopes: Map<string, Envelope>): string {
+  const voteText = ['**A vote has started involving the following users:**'];
+  voteText.push('');
+  for (const user of users) {
+    const envelope = envelopes.get(user.id);
+    const perUserText = ` - ${user} ` +
+      (envelope == null ?
+        '*hasn\'t approved yet*' :
+        `has approved unsealing "${envelope.title}"`);
+    voteText.push(perUserText);
+  }
+  voteText.push('');
+  voteText.push(`React with ${APPROVE_REACT} to approve the unsealing `
+    + 'of your most recent envelope. Unsealing will occur only if all users '
+    + 'approve within the next hour.');
+  voteText.push('');
+  voteText.push(
+    '**I will edit this message with envelope names as users react.** '
+    + 'You can remove your react to undo approval - the last user to approve '
+    + 'will have 10 seconds to do so.');
+  voteText.push('');
+  voteText.push(`I will also react with ${APPROVE_REACT} for convenience.`);
+
+  return voteText.join('\n');
+}
 
 /** Performs creation and management of sealed envelopes. */
 export default class Sealer {
@@ -26,8 +70,7 @@ export default class Sealer {
     });
 
     this.database.insert
-  }
-
+  } 
   public async seal(
     flagsAndArgs: FlagsAndArgs, message: Message): Promise<void> {
     const [title, content] = flagsAndArgs.args;
@@ -85,79 +128,46 @@ export default class Sealer {
     flagsAndArgs: FlagsAndArgs,
     message: Message,
     client: Client): Promise<void> {
-    const users: User[] = [];
-    const userIdSet: Set<string> = new Set();
-    const envelopes: Envelope[] = [];
+    const users = await fetchUsers(flagsAndArgs.args.map(mentionToId), client);
+    const userIdSet = new Set(users.map((user): string => user.id));
+    const envelopes: Map<string, Envelope> = new Map();
 
-    for(const tag of flagsAndArgs.args) {
-      // Validate @ tag and extract user ID
-      const match = tag.match(TAG_PATTERN);
-      if (match === null || match.length !== 2) { 
-        throw new ClientError(`Unrecognized argument ${tag}. Expect an @ tag`);
-      }
-      const id = match[1];
-
-      // Ensure each ID corresponds to a real user
-      try {
-        users.push(await client.users.fetch(id));
-      } catch(err) {
-        throw new ClientError(`Failed to find user with ID ${id}`, err);
-      }
-
-      // Ensure each user is specified only once
-      if (userIdSet.has(id)) {
-        throw new ClientError(
-          `User ${users[users.length - 1]} listed more than once`);
-      } else {
-        userIdSet.add(id);
-      }
-      
-      // Gather the latest envelope from each specified user
-      try {
-        const userEnvelopes = await this.database
-          .find<Envelope>({ author: id }).sort({ time: -1 }).limit(1);
-        if (userEnvelopes.length === 0) {
-          throw new ClientError(`User with ID ${id} has no envelopes`);
-        }
-        envelopes.push(userEnvelopes[0]);
-      } catch (err) {
-        throw new ClientError('Error while accessing database', err);
-      }
-    }
-
-    // List the envelopes we found and ask for approval reacts
-    const voteText = ['A vote has started involving the following envelopes:'];
-    for (let i = 0; i < envelopes.length; i++) {
-      voteText.push(` - "${envelopes[i].title}" from ${users[i]}`);
-    }
-    voteText.push('');
-    voteText.push(`React with ${APPROVE_REACT} to approve the unsealing `
-      + 'of your envelope. Unsealing will occur only if all users '
-      + 'approve within the next hour.');
-    voteText.push('');
-    voteText.push(`I will also react with ${APPROVE_REACT} for convenience.`);
-    const voteMessage =
-      await message.channel.send(voteText.join('\n')) as Message;
+    const voteMessage = 
+      await message.channel.send(buildVoteMessage(users, envelopes));
     await voteMessage.react(APPROVE_REACT);
 
-    // Wait for reacts and then process them
-    const filter = (reaction: MessageReaction, user: User): boolean => {
-      return reaction.emoji.name === APPROVE_REACT && userIdSet.has(user.id);
-    };
+    const voteCollector = voteMessage.createReactionCollector(
+      createFilter(APPROVE_REACT, userIdSet),
+      { max: users.length, time: HOUR_MS, dispose: true });
 
-    const collector = voteMessage
-      .createReactionCollector(filter, { max: users.length, time: HOUR_MS });
+    let pendingEditsPromise: Promise<void> = Promise.resolve();
 
-    // Presumably no events will be triggered by the collector after 'end'
-    // has been triggered
-    await new Promise((resolve): void => {
-      collector.on('end', (): void => {
-        resolve();
-      })
+    voteCollector.on('collect', (reaction, user): void => {
+      pendingEditsPromise = 
+        pendingEditsPromise
+          .then((): Promise<Envelope> => this.getLatestEnvelope(user.id))
+          .then((envelope): Promise<Message> => {
+            envelopes.set(user.id, envelope);
+            return voteMessage.edit(buildVoteMessage(users, envelopes));
+          })
+          .then();
     });
 
+    voteCollector.on('remove', (reaction, user): void => {
+      pendingEditsPromise = 
+        pendingEditsPromise
+          .then((): Promise<Message> => {
+            envelopes.delete(user.id);
+            return voteMessage.edit(buildVoteMessage(users, envelopes));
+          })
+          .then();
+    });
+
+    await awaitCollectorEnd(voteCollector);
+    await pendingEditsPromise;
+
     {
-      const reaction = collector.collected.first();
+      const reaction = voteCollector.collected.first();
       const count = reaction != null ? reaction.count : 0;
       if (count < users.length) {
         throw new ClientError(
@@ -166,15 +176,55 @@ export default class Sealer {
       }
     }
 
-    // Randomize the order of the indices we plan to access
-    const indices = [...Array(users.length).keys()];
-    shuffle(indices);
+    const countdownMessage = await message.channel.send(
+      'All approvals received!\n'
+      + '**Envelopes will be unsealed in 30 seconds '
+      + `unless a user reacts to this message with ${CANCEL_REACT}.**\n`
+      + `I will also react with ${CANCEL_REACT} for convenience.`);
+    await countdownMessage.react(CANCEL_REACT);
 
-    for(let i = 0; i < users.length; i++) {
-      const envelope = envelopes[indices[i]];
+    const countdownCollector =
+      countdownMessage.createReactionCollector(
+        createFilter(CANCEL_REACT, userIdSet),
+        { max: 1, time: THIRTY_SEC_MS });
+
+    let cancelledBy: User|null = null;
+    countdownCollector.on('collect', (reaction, user): void => {
+      cancelledBy = user;
+    });
+
+    await awaitCollectorEnd(countdownCollector);
+    if (countdownCollector.collected.size > 0) {
+      throw new ClientError(
+        cancelledBy == null ?
+          'Envelope unsealing cancelled' /* Shouldn't happen */: 
+          `Envelope unsealing cancelled by ${cancelledBy}`);
+    }
+
+    shuffle(users);
+
+    for (const user of users) {
+      const envelope = envelopes.get(user.id);
+      if (envelope == null) {
+        throw new Error(
+          `Expected all users to have an envelope, but ${user} did not`);
+      }
       message.channel.send(`Unsealing "${envelope.title}" from `
-          + `${users[indices[i]]} on ${envelope.time}:`
+          + `${user} on ${envelope.time}:`
           + `\n${envelope.content}`);
+    }
+  }
+
+  private async getLatestEnvelope(authorId: string): Promise<Envelope> {
+    try {
+      const envelopes = await this.database
+        .find<Envelope>({ author: authorId }).sort({ time: -1 }).limit(1);
+      if (envelopes.length === 0) {
+        throw new ClientError(`User with ID ${authorId} has no envelopes`);
+      }
+      return envelopes[0];
+    } catch (err) {
+      throw new ClientError('Error while accessing database', err);
     }
   }
 
