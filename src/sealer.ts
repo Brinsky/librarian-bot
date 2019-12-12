@@ -166,14 +166,13 @@ export default class Sealer {
     await awaitCollectorEnd(voteCollector);
     await pendingEditsPromise;
 
-    {
-      const reaction = voteCollector.collected.first();
-      const count = reaction != null ? reaction.count : 0;
-      if (count < users.length) {
-        throw new ClientError(
-          `Only received ${count} out of ${users.length} responses after `
-          + `one hour`);
-      }
+    // We use envelopes.size instead of examining voteCollector.collected
+    // because the count for a given reaction includes reacts that didn't
+    // pass the filter.
+    if (envelopes.size < users.length) {
+      throw new ClientError(
+        `Only received ${envelopes.size} out of ${users.length} responses `
+        + `after one hour`);
     }
 
     const countdownMessage = await message.channel.send(
@@ -203,15 +202,21 @@ export default class Sealer {
 
     shuffle(users);
 
+    // Ensure all users have an envelope before unsealing any of them
+    const unsealMessages: string[] = [];
     for (const user of users) {
       const envelope = envelopes.get(user.id);
       if (envelope == null) {
         throw new Error(
           `Expected all users to have an envelope, but ${user} did not`);
       }
-      message.channel.send(`Unsealing "${envelope.title}" from `
+      unsealMessages.push(`Unsealing "${envelope.title}" from `
           + `${user} on ${envelope.time}:`
           + `\n${envelope.content}`);
+    }
+
+    for (const unsealMessage of unsealMessages) {
+      message.channel.send(unsealMessage);
     }
   }
 
