@@ -4,8 +4,8 @@
   "description": "A simple Discord bot for book club",
   "main": "index.js",
   "scripts": {
-    "lint": "eslint",
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "lint": "node_modules/eslint/bin/eslint.js",
+    "test": "node_modules/jasmine/bin/jasmine.js --config=jasmine.json"
   },
   "author": "",
   "license": "MIT",
@@ -16,9 +16,11 @@
     "typescript": "^3.7.3"
   },
   "devDependencies": {
-    "@types/node": "^12.12.17",
+    "@types/jasmine": "^3.5.2",
+    "@types/node": "^12.12.25",
     "@typescript-eslint/eslint-plugin": "^1.13.0",
     "@typescript-eslint/parser": "^1.13.0",
-    "eslint": "^5.16.0"
+    "eslint": "^5.16.0",
+    "jasmine": "^3.5.0"
   }
 }

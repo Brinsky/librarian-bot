@@ -25,6 +25,11 @@ client.on('ready', (): void => {
 });
 
 client.on('message', async (message): Promise<void> => {
+  // We never expect new messages to be partial messages
+  if (message.partial) {
+    return;
+  }
+
   let text = message.content;
 
   // Only process commands with the appropriate prefix
