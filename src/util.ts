@@ -71,7 +71,7 @@ export async function fetchUsers(
   return users;
 }
 
-const MENTION_PATTERN = /<@(\d+)>/;
+const MENTION_PATTERN = /<@!?(\d+)>/;
 
 /**
  * Converts a user mention (e.g. <@123456>) to a user ID (e.g. 123456). Throws
