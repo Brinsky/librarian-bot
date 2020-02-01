@@ -1,4 +1,4 @@
-import {Client, User} from 'discord.js'
+import {Client, Message, User} from 'discord.js'
 import {ClientError} from './error'
 
 /** Performs naive pluralization of English words. */
@@ -85,4 +85,37 @@ export function mentionToId(mention: string): string {
       `Unrecognized argument ${mention}. Expected an @ tag`);
   }
   return match[1];
+}
+
+export async function markPending(msg: Message): Promise<void> {
+  await msg.react('\u231B');
+}
+
+export async function markComplete(
+  msg: Message, client: Client): Promise<void> {
+  // Refetch the message from the channel to get the latest reactions.
+  // For some reason msg.fetch() doesn't seem to do this.
+  msg = await msg.channel.messages.fetch(msg.id); 
+
+  const existing = msg.reactions.find((r) => r.emoji.name === '\u231B');
+  if (existing && client.user) {
+    existing.users.remove(client.user);
+  }
+  await msg.react('\u2705');
+}
+
+export function escapeMarkdownChars(text: string): string {
+  const unescaped = text.replace(/\\([\\*_~`])/g, '$1');
+  return unescaped.replace(/[\\*_~`]/g, '\\$&');
+}
+
+export function formatDate(date: Date) {
+  return date.toLocaleDateString('en-US', {
+    timeZone: 'America/New_York',
+    year: 'numeric',
+    month: 'numeric',
+    day: 'numeric',
+    hour: 'numeric',
+    minute: 'numeric',
+  });
 }
