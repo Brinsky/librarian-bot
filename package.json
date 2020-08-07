@@ -11,16 +11,16 @@
   "license": "MIT",
   "dependencies": {
     "@types/ws": "^6.0.4",
-    "discord.js": "github:discordjs/discord.js",
+    "discord.js": "^12.2.0",
     "nedb-promises": "^3.0.7",
-    "typescript": "^3.7.3"
+    "typescript": "^3.9.7"
   },
   "devDependencies": {
-    "@types/jasmine": "^3.5.2",
-    "@types/node": "^12.12.25",
+    "@types/jasmine": "^3.5.12",
+    "@types/node": "^12.12.54",
     "@typescript-eslint/eslint-plugin": "^1.13.0",
     "@typescript-eslint/parser": "^1.13.0",
     "eslint": "^5.16.0",
-    "jasmine": "^3.5.0"
+    "jasmine": "^3.6.1"
   }
 }

@@ -42,9 +42,9 @@ client.on('messageReactionRemove', async(reaction, user) => {
   const message =
     await reaction.message.channel.messages.fetch(reaction.message.id);
 
-  const matchingReaction = message.reactions.find(
+  const matchingReaction = message.reactions.cache.find(
     (r) => r.emoji.toString() === reaction.emoji.toString());
-  if (matchingReaction === undefined || matchingReaction.users.size == 0) {
+  if (matchingReaction === undefined || matchingReaction.users.cache.size == 0) {
     aggregators.handleEvent(message.channel.id, {
       msgId: message.id,
       eventType: EventType.REMOVE_EMOJI,

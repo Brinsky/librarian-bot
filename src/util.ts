@@ -97,7 +97,7 @@ export async function markComplete(
   // For some reason msg.fetch() doesn't seem to do this.
   msg = await msg.channel.messages.fetch(msg.id); 
 
-  const existing = msg.reactions.find((r) => r.emoji.name === '\u231B');
+  const existing = msg.reactions.cache.find((r) => r.emoji.name === '\u231B');
   if (existing && client.user) {
     existing.users.remove(client.user);
   }

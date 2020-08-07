@@ -47,10 +47,10 @@ export class Aggregators {
     let channel;
     if (flagsAndArgs.flags.has('-c')) {
       const channelId = flagsAndArgs.flags.get('-c')!;
-      if (client.channels.has(channelId)) {
-        channel = client.channels.get(channelId)!;
-      } else {
-        throw new ClientError(`Unknown channel ${channelId}`);
+      try {
+        await client.channels.fetch(channelId);
+      } catch (err) {
+        throw new ClientError(`Unknown channel ${channelId}`, err);
       }
     } else {
       channel = message.channel;
@@ -195,7 +195,7 @@ class Aggregator {
       totalMessages += messages.size;
 
       for (const msg of messages.values()) {
-        for (const react of msg.reactions.values()) {
+        for (const react of msg.reactions.cache.values()) {
           this.messageIdsToEmojis.link(msg.id, react.emoji.toString());
         }
       }
