@@ -7,10 +7,12 @@ import {emojify} from './emojifier'
 import Sealer from './sealer'
 import {picker} from './picker'
 import {Aggregators, EventType} from './aggregator'
+import VoiceManager from './voicemanager'
 
 const client = new Client({ partials: ['CHANNEL', 'MESSAGE', 'REACTION'] });
 const sealer = new Sealer();
 const aggregators = new Aggregators();
+const voiceManager = new VoiceManager();
 
 const COMMANDS: ReadonlyMap<string, CommandSpec> = new Map([
   ['emojify', new CommandSpec(emojify, [], 1)],
@@ -24,6 +26,12 @@ const COMMANDS: ReadonlyMap<string, CommandSpec> = new Map([
       aggregators.aggregate.bind(aggregators),
       [new FlagSpec('-c', true), new FlagSpec('-r', false)], 1, 1)
   ],
+  ['vjoin', new CommandSpec(voiceManager.vjoin.bind(voiceManager), [], 0, 0)],
+  [
+    'vleave', 
+    new CommandSpec(voiceManager.vleave.bind(voiceManager), [], 0, 0)
+  ],
+  ['vplay', new CommandSpec(voiceManager.vplay.bind(voiceManager), [], 0, 0)],
 ]);
 
 /////////// Event-handling code ///////////
@@ -39,8 +47,8 @@ client.on('messageReactionAdd', async (reaction, user) => {
 client.on('messageReactionRemove', async(reaction, user) => {
   // We re-fetch the message so that we have the latest set of reactions
   // (which excludes the one being removed here)
-  const message =
-    await reaction.message.channel.messages.fetch(reaction.message.id);
+  const message = reaction.message.partial
+    ? await reaction.message.fetch() : reaction.message;
 
   const matchingReaction = message.reactions.cache.find(
     (r) => r.emoji.toString() === reaction.emoji.toString());

@@ -7,7 +7,6 @@
     "lint": "node_modules/eslint/bin/eslint.js",
     "test": "node_modules/jasmine/bin/jasmine.js --config=jasmine.json"
   },
-
   "repository": {
     "type": "git",
     "url": "https://github.com/Brinsky/librarian-bot.git"
@@ -15,8 +14,10 @@
   "author": "",
   "license": "MIT",
   "dependencies": {
+    "@discordjs/opus": "^0.3.2",
     "@types/ws": "^6.0.4",
     "discord.js": "^12.4.1",
+    "ffmpeg-static": "^4.2.7",
     "nedb-promises": "^3.0.7",
     "typescript": "^3.9.7"
   },
