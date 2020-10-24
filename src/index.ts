@@ -26,12 +26,16 @@ const COMMANDS: ReadonlyMap<string, CommandSpec> = new Map([
       aggregators.aggregate.bind(aggregators),
       [new FlagSpec('-c', true), new FlagSpec('-r', false)], 1, 1)
   ],
-  ['vjoin', new CommandSpec(voiceManager.vjoin.bind(voiceManager), [], 0, 0)],
+  [
+    'vjoin',
+    new CommandSpec(
+      voiceManager.vjoin.bind(voiceManager), [new FlagSpec('-c', true)], 0, 0)
+  ],
   [
     'vleave', 
     new CommandSpec(voiceManager.vleave.bind(voiceManager), [], 0, 0)
   ],
-  ['vplay', new CommandSpec(voiceManager.vplay.bind(voiceManager), [], 0, 0)],
+  ['vplay', new CommandSpec(voiceManager.vplay.bind(voiceManager), [], 1, 1)],
 ]);
 
 /////////// Event-handling code ///////////

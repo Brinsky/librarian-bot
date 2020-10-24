@@ -48,7 +48,7 @@ export class Aggregators {
     if (flagsAndArgs.flags.has('-c')) {
       const channelId = flagsAndArgs.flags.get('-c')!;
       try {
-        await client.channels.fetch(channelId);
+        channel = await client.channels.fetch(channelId);
       } catch (err) {
         throw new ClientError(`Unknown channel ${channelId}`, err);
       }

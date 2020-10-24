@@ -1,4 +1,5 @@
 src/config.json
+src/soundboard.json
 build/
 node_modules/
 nohup.out
