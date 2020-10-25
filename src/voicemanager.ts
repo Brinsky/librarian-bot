@@ -11,8 +11,8 @@ interface TrackMap {
   [key: string]: string;
 }
 
-const HOUR_MS = 10 * 1000; //60 * 60 * 1000;
-const MAX_ACTIVE_SOUNDBOARDS = 1; //3;
+const HOUR_MS = 60 * 60 * 1000;
+const MAX_ACTIVE_SOUNDBOARDS = 3;
 
 function buildSoundboardMessage(trackMap: TrackMap) {
   const msg: string[] = [];
