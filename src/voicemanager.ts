@@ -1,14 +1,26 @@
 import {Client, Message, Snowflake, VoiceChannel, VoiceConnection} from 'discord.js'
 import {FlagsAndArgs} from './command'
-import {ClientError, indicateSuccess} from './error'
-import soundboardJson from './soundboard.json'
+import {ClientError, indicateSuccess, logClientError, logError} from './error'
+import {promisify} from 'util'
+import * as fs from 'fs'
 
-// TODO: Find a better way to use the JSON as a map
-// Map of emojis to audio filenames under ./data/music
-const soundboard: {[key: string]: string} = soundboardJson;
+const stat = promisify(fs.stat);
+
+interface TrackMap {
+  [key: string]: string;
+}
 
 export default class VoiceManager {
   private connection: null|VoiceConnection = null;
+  private trackMap: TrackMap;
+
+  public constructor() {
+    // Okay to do synchronously as this constructor should be called during
+    // program startup
+    this.trackMap =
+      JSON.parse(
+        fs.readFileSync('data/soundboard.json').toString()) as TrackMap;
+  }
 
   // Prompts the bot to join a voice channel
   public async vjoin(
@@ -66,7 +78,7 @@ export default class VoiceManager {
   }
 
   // Plays an audio track in the current voice channel
-  public async vplay(flagsAndArgs: FlagsAndArgs): Promise<void> {
+  public async vplay(flagsAndArgs: FlagsAndArgs, message: Message): Promise<void> {
     const key = flagsAndArgs.args[0];
 
     if (this.connection == null) {
@@ -79,15 +91,28 @@ export default class VoiceManager {
       throw new ClientError('Already playing audio');
     }
 
-    if (!soundboard.hasOwnProperty(key)) {
+    if (!this.trackMap.hasOwnProperty(key)) {
       throw new ClientError('Unknown audio track');
     }
 
-    const trackPath = `data/music/${soundboard[key]}`;
-    console.log(`Playing audio: ${trackPath}`);
+    const trackPath = `data/music/${this.trackMap[key]}`;
 
-    // TODO: Error handling
+    // Confirm that the file exists (dispatcher doesn't seem to throw an error
+    // when it doesn't)
+    try {
+      await stat(trackPath);
+    } catch (err) {
+      logClientError(
+        message, `Requested audio file not found: ${this.trackMap[key]}`);
+      logError(err);
+      return;
+    }
+
+    console.log(`Playing audio: ${trackPath}`);
     const dispatcher = this.connection.play(trackPath);
+    dispatcher.on('error', (err: Error) => {
+      logClientError(message, err.toString());
+    });
   }
 
   private disconnect(): boolean {

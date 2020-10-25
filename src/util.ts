@@ -1,5 +1,9 @@
 import {Client, Message, User} from 'discord.js'
 import {ClientError} from './error'
+import {promisify} from 'util'
+import * as fs from 'fs'
+
+const readFile = promisify(fs.readFile);
 
 /** Performs naive pluralization of English words. */
 export function pluralize(
@@ -118,4 +122,13 @@ export function formatDate(date: Date) {
     hour: 'numeric',
     minute: 'numeric',
   });
+}
+
+/**
+ * Encapsulates the dirty work of file reading, parsing, and unsafe casts.
+ * Will propogate any exceptions thrown in the process.
+ */
+export async function readJsonFile<T>(filePath: string): Promise<T> {
+  const contents = (await readFile(filePath)).toString();
+  return JSON.parse(contents) as T;
 }

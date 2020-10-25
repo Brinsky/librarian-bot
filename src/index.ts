@@ -1,5 +1,4 @@
 import {Client} from 'discord.js'
-import config from './config.json'
 import {lex} from './lexer'
 import {ClientError, logClientError, logError} from './error'
 import {CommandSpec, FlagSpec, parseCommand} from './command'
@@ -8,6 +7,18 @@ import Sealer from './sealer'
 import {picker} from './picker'
 import {Aggregators, EventType} from './aggregator'
 import VoiceManager from './voicemanager'
+import * as fs from 'fs'
+
+interface Config {
+  token: string;
+  prefix: string;
+}
+
+// Will be overwritten from file at init() time
+let config: Config = {
+  token: '',
+  prefix: '',
+}
 
 const client = new Client({ partials: ['CHANNEL', 'MESSAGE', 'REACTION'] });
 const sealer = new Sealer();
@@ -130,11 +141,23 @@ client.on('message', async (message) => {
   }
 });
 
-// Print error events to stderr
-client.on('error', console.error);
-process.on('uncaughtException', console.error);
-process.on('unhandledRejection', console.error);
-
 /////////// Startup code ///////////
 
-client.login(config.token);
+const init = function(): void {
+  try {
+    config = 
+      JSON.parse(fs.readFileSync('data/config.json').toString()) as Config
+  } catch (err) {
+    logError('Failed to read configuration file; shutting down');
+    return;
+  }
+
+  // Print error events to stderr
+  client.on('error', console.error);
+  process.on('uncaughtException', console.error);
+  process.on('unhandledRejection', console.error);
+
+  client.login(config.token);
+};
+
+init();
