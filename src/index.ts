@@ -47,6 +47,7 @@ const COMMANDS: ReadonlyMap<string, CommandSpec> = new Map([
     new CommandSpec(voiceManager.vleave.bind(voiceManager), [], 0, 0)
   ],
   ['vplay', new CommandSpec(voiceManager.vplay.bind(voiceManager), [], 1, 1)],
+  ['board', new CommandSpec(voiceManager.board.bind(voiceManager), [], 0, 0)],
 ]);
 
 /////////// Event-handling code ///////////
@@ -143,7 +144,7 @@ client.on('message', async (message) => {
 
 /////////// Startup code ///////////
 
-const init = function(): void {
+function init(): void {
   try {
     config = 
       JSON.parse(fs.readFileSync('data/config.json').toString()) as Config

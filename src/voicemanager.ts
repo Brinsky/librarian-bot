@@ -1,8 +1,9 @@
-import {Client, Message, Snowflake, VoiceChannel, VoiceConnection} from 'discord.js'
+import {Client, Message, MessageReaction, Snowflake, VoiceChannel, VoiceConnection} from 'discord.js'
 import {FlagsAndArgs} from './command'
 import {ClientError, indicateSuccess, logClientError, logError} from './error'
 import {promisify} from 'util'
 import * as fs from 'fs'
+import {awaitCollectorEnd} from './util'
 
 const stat = promisify(fs.stat);
 
@@ -10,8 +11,21 @@ interface TrackMap {
   [key: string]: string;
 }
 
+const HOUR_MS = 10 * 1000; //60 * 60 * 1000;
+const MAX_ACTIVE_SOUNDBOARDS = 1; //3;
+
+function buildSoundboardMessage(trackMap: TrackMap) {
+  const msg: string[] = [];
+  msg.push('The following audio tracks are available:');
+  for (const emoji in trackMap) {
+    msg.push(`\n${emoji}  ${trackMap[emoji]}`);
+  }
+  return msg.join('\n');
+}
+
 export default class VoiceManager {
   private connection: null|VoiceConnection = null;
+  private activeSoundboards = 0;
   private trackMap: TrackMap;
 
   public constructor() {
@@ -77,42 +91,103 @@ export default class VoiceManager {
     }
   }
 
-  // Plays an audio track in the current voice channel
+  // Plays an audio track in the current voice channel (referenced by emoji)
   public async vplay(flagsAndArgs: FlagsAndArgs, message: Message): Promise<void> {
-    const key = flagsAndArgs.args[0];
+    await this.playTrack(flagsAndArgs.args[0]);
+  }
 
-    if (this.connection == null) {
-      throw new ClientError('Not connected to a voice channel');
-    }
-
-    // TODO: Remove this and implement queueing
-    // Dispatcher property only becomes null once audio track ends
-    if (this.connection.dispatcher != null) {
-      throw new ClientError('Already playing audio');
-    }
-
+  private async playTrack(key: string): Promise<void> {
     if (!this.trackMap.hasOwnProperty(key)) {
       throw new ClientError('Unknown audio track');
     }
+    
+    const fileName = this.trackMap[key];
+    const trackPath = 'data/music/' + fileName;
 
-    const trackPath = `data/music/${this.trackMap[key]}`;
-
-    // Confirm that the file exists (dispatcher doesn't seem to throw an error
-    // when it doesn't)
+    // Confirm that the file exists (dispatcher will fail gracefully if it
+    // doesn't, but we want to inform the user)
     try {
       await stat(trackPath);
     } catch (err) {
-      logClientError(
-        message, `Requested audio file not found: ${this.trackMap[key]}`);
+      throw new ClientError('Requested audio file not found: ' + fileName);
       logError(err);
       return;
     }
 
-    console.log(`Playing audio: ${trackPath}`);
+    // Final check that connection exists and nothing else is playing
+    if (this.connection == null) {
+      throw new ClientError('Not connected to a voice channel');
+    }
+
     const dispatcher = this.connection.play(trackPath);
     dispatcher.on('error', (err: Error) => {
-      logClientError(message, err.toString());
+      logError(err.toString());
     });
+    console.log(`Playing audio: ${trackPath}`);
+  }
+
+  public async board(flagsAndArgs: FlagsAndArgs, message: Message): Promise<void> {
+    if (this.activeSoundboards >= MAX_ACTIVE_SOUNDBOARDS) {
+      throw new ClientError(
+        'Too many active soundboards; max is ' + MAX_ACTIVE_SOUNDBOARDS);
+    }
+    this.activeSoundboards++;
+
+    try {
+      await this.boardInternal(message);
+    } finally {
+      this.activeSoundboards--;  
+    }
+  }
+
+  private async boardInternal(message: Message): Promise<void> {
+    const boardMsgText = buildSoundboardMessage(this.trackMap);
+    const boardMsg =
+      await message.channel.send(boardMsgText + '\n\n*Initializing...*');
+
+    // React with each track's emoji
+    const reactPromises: Array<Promise<MessageReaction>> = [];
+    for (const emoji in this.trackMap) {
+      reactPromises.push(boardMsg.react(emoji));
+    }
+    try {
+      await Promise.all(reactPromises);
+    } catch (err) {
+      logError('Failed to react with one or more emojis: ' + err);
+    }
+
+    const filterFunc = (reaction: MessageReaction) => {
+      return this.trackMap.hasOwnProperty(reaction.emoji.name);
+    };
+    const collector = boardMsg.createReactionCollector(
+      filterFunc, { idle: HOUR_MS, dispose: true });
+
+    // Play on both emoji add and remove (as both indiciate a "click");
+    const playTrackFunc = async (reaction: MessageReaction) => {
+      try {
+        await this.playTrack(reaction.emoji.name);
+      } catch (err) {
+        logClientError(message, err.message);
+      }
+    };
+    collector.on('collect', playTrackFunc);
+    collector.on('remove', playTrackFunc);
+
+    // Ready state
+    await boardMsg.edit(
+      boardMsgText + '\n\n**Ready.** '
+      + 'This soundboard will time out after an hour with no interactions.');
+    await awaitCollectorEnd(collector);
+
+    // Cleanup
+    await boardMsg.edit(
+      boardMsgText + '\n\n**This soundboard has timed out**');
+    try {
+      // May fail if bot doesn't have a role w/ "Manage Messages" privilege
+      await boardMsg.reactions.removeAll();
+    } catch (err) {
+      logError(err);
+    }
   }
 
   private disconnect(): boolean {

@@ -1,4 +1,4 @@
-import {Client, Message, User} from 'discord.js'
+import {Client, Collector, Message, User} from 'discord.js'
 import {ClientError} from './error'
 import {promisify} from 'util'
 import * as fs from 'fs'
@@ -131,4 +131,16 @@ export function formatDate(date: Date) {
 export async function readJsonFile<T>(filePath: string): Promise<T> {
   const contents = (await readFile(filePath)).toString();
   return JSON.parse(contents) as T;
+}
+
+/**
+ * Returns a promise that resolves when the provided collector emits an 'end'
+ * event.
+ */
+export function awaitCollectorEnd<K, V>(collector: Collector<K, V>): Promise<void> {
+  return new Promise((resolve): void => {
+    collector.on('end', (): void => {
+      resolve();
+    });
+  });
 }

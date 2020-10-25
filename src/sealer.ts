@@ -2,7 +2,7 @@ import Datastore from 'nedb-promises'
 import {Client, Collector, Message, MessageReaction, User} from 'discord.js'
 import {FlagsAndArgs} from './command'
 import {ClientError, indicateSuccess} from './error'
-import {assertNonNull, fetchUsers, mentionToId, shuffle} from './util'
+import {assertNonNull, awaitCollectorEnd, fetchUsers, mentionToId, shuffle} from './util'
 
 interface Envelope {
   readonly author: string;
@@ -15,14 +15,6 @@ const HOUR_MS = 60 * 60 * 1000;
 const THIRTY_SEC_MS = 30 * 1000;
 const APPROVE_REACT = '\u2611'; // "Ballot box with check emoji"
 const CANCEL_REACT = '\uD83D\uDEAB'; // "No entry sign emoji"
-
-function awaitCollectorEnd<K, V>(collector: Collector<K, V>): Promise<void> {
-  return new Promise((resolve): void => {
-    collector.on('end', (): void => {
-      resolve();
-    });
-  });
-}
 
 function createFilter(
   emojiName: string, 

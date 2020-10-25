@@ -4,4 +4,6 @@ nohup.out
 data/**/*
 !data/config-sample.json
 !data/soundboard-sample.json
+!data/music
+data/music/**/*
 !data/music/fakefile.wav
