@@ -2,7 +2,7 @@ import {Client} from 'discord.js'
 import {lex} from './lexer'
 import {ClientError, logClientError, logError} from './error'
 import {CommandSpec, FlagSpec, parseCommand} from './command'
-import {emojify} from './emojifier'
+import {emojify, utf} from './emojifier'
 import Sealer from './sealer'
 import {picker} from './picker'
 import {Aggregators, EventType} from './aggregator'
@@ -27,6 +27,7 @@ const voiceManager = new VoiceManager();
 
 const COMMANDS: ReadonlyMap<string, CommandSpec> = new Map([
   ['emojify', new CommandSpec(emojify, [], 1)],
+  ['utf', new CommandSpec(utf, [], 1)],
   ['seal', new CommandSpec(sealer.seal.bind(sealer), [], 2, 2)],
   ['unseal', new CommandSpec(sealer.unseal.bind(sealer), [], 1, 1)],
   ['vote', new CommandSpec(sealer.vote.bind(sealer), [], 1, -1)],

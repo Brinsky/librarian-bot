@@ -67,3 +67,21 @@ export async function emojify(
     message.channel.send(emojifyText(args[i]));
   }
 }
+
+/**
+ * Converts strings to UTF-16 "escaped" encoding, e.g. '\uABCD\u1234'.
+ */
+export async function utf(flagsAndArgs: FlagsAndArgs, message: Message): Promise<void> {
+  // Iterate over each argument (whitespace separated text/emojis)
+  const allEncoded: string[] = [];
+  for (const arg of flagsAndArgs.args) {
+    // Capture each UTF-16 code point in the string
+    const encoded: string[] = [];
+    for (let i = 0; i < arg.length; i++) {
+      encoded.push('\\u' + arg.charCodeAt(i).toString(16).toUpperCase());
+    }
+    allEncoded.push(encoded.join(''));
+  }
+
+  message.reply(allEncoded.join(' '));
+}

@@ -32,8 +32,7 @@ export default class VoiceManager {
     // Okay to do synchronously as this constructor should be called during
     // program startup
     this.trackMap =
-      JSON.parse(
-        fs.readFileSync('data/soundboard.json').toString()) as TrackMap;
+      JSON.parse(fs.readFileSync('data/soundboard.json').toString()) as TrackMap;
   }
 
   // Prompts the bot to join a voice channel
