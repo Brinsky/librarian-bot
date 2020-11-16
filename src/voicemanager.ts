@@ -1,6 +1,6 @@
 import {Client, Message, MessageReaction, Snowflake, VoiceChannel, VoiceConnection} from 'discord.js'
 import {FlagsAndArgs} from './command'
-import {ClientError, indicateSuccess, logClientError, logError} from './error'
+import {ClientError, indicateSuccess, logClientError, log} from './error'
 import {promisify} from 'util'
 import * as fs from 'fs'
 import {awaitCollectorEnd} from './util'
@@ -109,7 +109,7 @@ export default class VoiceManager {
       await stat(trackPath);
     } catch (err) {
       throw new ClientError('Requested audio file not found: ' + fileName);
-      logError(err);
+      log(err);
       return;
     }
 
@@ -120,7 +120,7 @@ export default class VoiceManager {
 
     const dispatcher = this.connection.play(trackPath);
     dispatcher.on('error', (err: Error) => {
-      logError(err.toString());
+      log(err.toString());
     });
     console.log(`Playing audio: ${trackPath}`);
   }
@@ -152,7 +152,7 @@ export default class VoiceManager {
     try {
       await Promise.all(reactPromises);
     } catch (err) {
-      logError('Failed to react with one or more emojis: ' + err);
+      log('Failed to react with one or more emojis: ' + err);
     }
 
     const filterFunc = (reaction: MessageReaction) => {
@@ -185,7 +185,7 @@ export default class VoiceManager {
       // May fail if bot doesn't have a role w/ "Manage Messages" privilege
       await boardMsg.reactions.removeAll();
     } catch (err) {
-      logError(err);
+      log(err);
     }
   }
 

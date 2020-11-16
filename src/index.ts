@@ -1,6 +1,6 @@
 import {Client} from 'discord.js'
 import {lex} from './lexer'
-import {ClientError, logClientError, logError} from './error'
+import {ClientError, logClientError, log} from './error'
 import {CommandSpec, FlagSpec, parseCommand} from './command'
 import {emojify, utf} from './emojifier'
 import Sealer from './sealer'
@@ -79,21 +79,22 @@ client.on('messageReactionRemove', async(reaction, user) => {
 });
 
 client.on('messageDelete', async(message) => {
-  // Fetching the message here results in an 'unknown message' API error
+  // Fetching the message would result in an 'unknown message' API error
+
   const channel = message.channel;
+  log(`messageDelete event: Message ID = ${message.id}, Channel ID = ${channel?.id}`);
+
   if (channel != null) {
     aggregators.handleEvent(channel.id, {
       msgId: message.id,
       eventType: EventType.DELETE_MSG,
       emoji: '',
     });
-  } else {
-    logError('Warning - unknown channel for deleted message');
   }
 });
 
 client.on('ready', () => {
-  console.log('I am ready!');
+  log('I am ready!');
 });
 
 client.on('message', async (message) => {
@@ -133,12 +134,12 @@ client.on('message', async (message) => {
     if (err instanceof ClientError) {
       logClientError(message, err.message);
       if (err.internalMessage != null) {
-        logError(err.internalMessage);
+        log(err.internalMessage);
       }
     } else {
       logClientError(
         message, 'Failed to execute command due to an internal error');
-      logError(err);
+      log(err);
     }
   }
 });
@@ -150,7 +151,7 @@ function init(): void {
     config = 
       JSON.parse(fs.readFileSync('data/config.json').toString()) as Config
   } catch (err) {
-    logError('Failed to read configuration file; shutting down');
+    log('Failed to read configuration file; shutting down');
     return;
   }
 
