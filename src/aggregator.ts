@@ -10,7 +10,7 @@ import {
 } from 'discord.js'
 import BidiMultiMap from './bidimultimap'
 import {FlagsAndArgs} from './command'
-import {ClientError} from './error'
+import {log, ClientError} from './error'
 import {
   escapeMarkdownChars,
   formatDate,
@@ -141,6 +141,10 @@ export class Aggregators {
   }
 }
 
+const CACHE_REBUILD_MESSAGE =
+  'A cache rebuild is already underway for this channel. ' +
+  'Please wait for it to finish.';
+
 class Aggregator {
   private readonly messageIdsToEmojis =
     new BidiMultiMap<Snowflake, string>();
@@ -150,6 +154,10 @@ class Aggregator {
   constructor(private readonly channel: SupportedChannel) {}
 
   public async getMessages(emoji: string): Promise<Message[]> {
+    if (this.buildingCache) {
+      throw new ClientError(CACHE_REBUILD_MESSAGE);
+    }
+
     if (!this.messageIdsToEmojis.containsB(emoji)) {
       return []
     };
@@ -171,14 +179,27 @@ class Aggregator {
   }
 
   public async buildCache(): Promise<void> {
+    try {
+      await this.buildCacheInternal();
+    } catch (err) {
+      // Don't leave this aggregator in a broken state
+      this.messageIdsToEmojis.clear();
+      this.eventQueue.length = 0; // Clears the array
+      this.buildingCache = false;
+
+      throw err;
+    }
+  }
+
+  public async buildCacheInternal(): Promise<void> {
     // Only one instance of this method should be running at a time
     if (this.buildingCache) {
-      throw new ClientError(
-        'A cache rebuild is already underway for this channel.' +
-        'Please wait for it to finish.'
-      );
+      throw new ClientError(CACHE_REBUILD_MESSAGE);
     }
     this.buildingCache = true;
+
+    this.messageIdsToEmojis.clear();
+    this.eventQueue.length = 0; // Clears the array
 
     // Fetch and process all messages
     let messages: Collection<Snowflake, Message>;
@@ -235,7 +256,16 @@ class Aggregator {
         this.messageIdsToEmojis.unlink(event.msgId, event.emoji);
         break;
       case EventType.DELETE_MSG:
-        this.messageIdsToEmojis.deleteA(event.msgId);
+        try {
+          this.messageIdsToEmojis.deleteA(event.msgId);
+        } catch (err) {
+          // Under the current implementation, messages with no reactions
+          // won't be in the map.
+          //
+          // It's possible the message was deleted before buildCache
+          // fetched it - in that case it also won't be in the map.
+          log('(Probably safe to ignore)' + err);
+        }
         break;
     }
   }

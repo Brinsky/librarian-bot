@@ -2,6 +2,11 @@ export default class BidiMultiMap<A, B> {
   private readonly aToBs: Map<A, Set<B>> = new Map();
   private readonly bToAs: Map<B, Set<A>> = new Map();
 
+  public clear(): void {
+    this.aToBs.clear();
+    this.bToAs.clear();
+  }
+
   public link(a: A, b: B): void {
     let bSet = this.aToBs.get(a);
     if (bSet === undefined) {
