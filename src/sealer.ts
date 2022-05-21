@@ -53,7 +53,7 @@ function buildVoteMessage(
 
 /** Performs creation and management of sealed envelopes. */
 export default class Sealer {
-  private database: Datastore;
+  private database: Datastore<unknown>;
 
   public constructor() {
     this.database = Datastore.create({
