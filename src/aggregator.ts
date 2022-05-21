@@ -9,6 +9,7 @@ import {
   TextChannel,
 } from 'discord.js'
 import BidiMultiMap from './bidimultimap'
+import * as chrono from 'chrono-node';
 import {FlagsAndArgs} from './command'
 import {log, ClientError} from './error'
 import {
@@ -35,6 +36,18 @@ interface Event {
 
 const CUSTOM_EMOJI_PATTERN = /<:\w+:(\d+)>/;
 
+function parseDate(s: string|null|undefined): Date|null {
+  if (s == null) {
+    return null;
+  }
+
+  const date = chrono.parseDate(s);
+  if (date === null) {
+    throw new ClientError(`Could note parse date: ${s}`);
+  }
+  return date;
+}
+
 export class Aggregators {
   // Channel ID -> Aggregator
   readonly aggregators = new Map<Snowflake, Aggregator>();
@@ -58,6 +71,9 @@ export class Aggregators {
     if (!(channel instanceof TextChannel || channel instanceof DMChannel)) {
       throw new ClientError(`Unsupported channel type ${typeof channel}`);
     }
+
+    const start = parseDate(flagsAndArgs.flags.get('-s'));
+    const end = parseDate(flagsAndArgs.flags.get('-e'));
 
     // Check if cache rebuild is requested
     let buildCache = flagsAndArgs.flags.has('-r');
@@ -90,7 +106,7 @@ export class Aggregators {
     }
 
     await this.sendResults(
-      message, rawEmoji, await aggregator.getMessages(emoji));
+      message, rawEmoji, await aggregator.getMessages(emoji, start, end));
     await markComplete(message, client);
   }
 
@@ -153,7 +169,7 @@ class Aggregator {
 
   constructor(private readonly channel: SupportedChannel) {}
 
-  public async getMessages(emoji: string): Promise<Message[]> {
+  public async getMessages(emoji: string, start: Date|null, end: Date|null): Promise<Message[]> {
     if (this.buildingCache) {
       throw new ClientError(CACHE_REBUILD_MESSAGE);
     }
@@ -164,7 +180,10 @@ class Aggregator {
 
     const messages: Message[] = [];
     for (const msgId of this.messageIdsToEmojis.getB(emoji)) {
-      messages.push(await this.channel.messages.fetch(msgId));
+      const message = await this.channel.messages.fetch(msgId);
+      if ((start === null || message.createdAt > start) && (end === null || message.createdAt < end)) {
+        messages.push(message);
+      }
     }
     // Sort by ascending creation date
     return messages.sort((msgA, msgB) => {

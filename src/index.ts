@@ -36,7 +36,7 @@ const COMMANDS: ReadonlyMap<string, CommandSpec> = new Map([
     'aggregate',
     new CommandSpec(
       aggregators.aggregate.bind(aggregators),
-      [new FlagSpec('-c', true), new FlagSpec('-r', false)], 1, 1)
+      [new FlagSpec('-c', true), new FlagSpec('-s', true), new FlagSpec('-e', true), new FlagSpec('-r', false)], 1, 1)
   ],
   [
     'vjoin',
