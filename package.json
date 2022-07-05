@@ -14,7 +14,7 @@
   "author": "",
   "license": "MIT",
   "dependencies": {
-    "@discordjs/opus": "^0.3.3",
+    "@discordjs/opus": "^0.8.0",
     "@types/ws": "^6.0.4",
     "chrono-node": "^2.3.8",
     "discord.js": "^12.5.3",
