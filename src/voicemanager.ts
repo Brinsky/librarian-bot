@@ -1,10 +1,19 @@
-import {Client, Message, MessageReaction, Snowflake, VoiceChannel, VoiceConnection} from 'discord.js'
+import {Client, Message, MessageReaction, Snowflake, VoiceChannel} from 'discord.js'
+import {
+  createAudioPlayer,
+  createAudioResource,
+  entersState,
+  joinVoiceChannel,
+  VoiceConnection,
+  VoiceConnectionStatus,
+} from '@discordjs/voice'
 import {FlagsAndArgs} from './command'
 import {ClientError, indicateSuccess, logClientError, log} from './error'
 import {promisify} from 'util'
 import * as fs from 'fs'
 import {awaitCollectorEnd} from './util'
 
+const EVENT_TIMEOUT_MS = 5000;
 const stat = promisify(fs.stat);
 
 interface TrackMap {
@@ -25,6 +34,8 @@ function buildSoundboardMessage(trackMap: TrackMap) {
 
 export default class VoiceManager {
   private connection: null|VoiceConnection = null;
+  private channelId: null|Snowflake = null;
+  private player = createAudioPlayer();
   private activeSoundboards = 0;
   private trackMap: TrackMap;
 
@@ -68,7 +79,7 @@ export default class VoiceManager {
     // Don't connect to the same channel twice, and don't stay in two channels
     // at the same time
     if (this.connection != null) {
-      if (this.connection.channel.id === voiceChannel.id) {
+      if (this.channelId === voiceChannel.id) {
         throw new ClientError('Already connected to the same voice channel');
       } else {
         this.disconnect();
@@ -76,9 +87,15 @@ export default class VoiceManager {
     }
 
     try {
-      this.connection = await voiceChannel.join();
+      this.connection = joinVoiceChannel({
+        channelId: voiceChannel.id,
+	guildId: voiceChannel.guild.id,
+	adapterCreator: voiceChannel.guild.voiceAdapterCreator,
+      });
+      this.channelId = voiceChannel.id;
       indicateSuccess(message);
     } catch (err: unknown) {
+      this.disconnect();
       throw new ClientError('Could not connect to voice channel', err as string);
     }
   }
@@ -118,10 +135,12 @@ export default class VoiceManager {
       throw new ClientError('Not connected to a voice channel');
     }
 
-    const dispatcher = this.connection.play(trackPath);
-    dispatcher.on('error', (err: Error) => {
-      log(err.toString());
-    });
+    const subscription = this.connection.subscribe(this.player);
+    if (subscription == null) {
+      throw new ClientError('Failed to connect audio player');
+    }
+
+    this.player.play(createAudioResource(trackPath));
     console.log(`Playing audio: ${trackPath}`);
   }
 
@@ -155,15 +174,18 @@ export default class VoiceManager {
       log('Failed to react with one or more emojis: ' + err as string);
     }
 
-    const filterFunc = (reaction: MessageReaction) => {
-      return this.trackMap.hasOwnProperty(reaction.emoji.name);
+    const filter = (reaction: MessageReaction) => {
+      return reaction.emoji.name != null && this.trackMap.hasOwnProperty(reaction.emoji.name);
     };
     const collector = boardMsg.createReactionCollector(
-      filterFunc, { idle: HOUR_MS, dispose: true });
+      {filter, idle: HOUR_MS, dispose: true});
 
     // Play on both emoji add and remove (as both indiciate a "click");
     const playTrackFunc = async (reaction: MessageReaction) => {
       try {
+        if (reaction.emoji.name == null) {
+	  throw new ClientError('Could not parse react emoji');
+	}
         await this.playTrack(reaction.emoji.name);
       } catch (err: unknown) {
         if (err instanceof Error) {
@@ -195,8 +217,9 @@ export default class VoiceManager {
   }
 
   private disconnect(): boolean {
+    this.channelId = null;
     if (this.connection != null) {
-      this.connection.disconnect();
+      this.connection.destroy();
       this.connection = null;
       return true;
     }

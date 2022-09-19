@@ -1,9 +1,9 @@
 import {
-  ChannelLogsQueryOptions,
   Client,
   Collection,
   DMChannel,
   Emoji,
+  FetchMessagesOptions,
   Message,
   Snowflake,
   TextChannel,
@@ -223,7 +223,7 @@ class Aggregator {
     // Fetch and process all messages
     let messages: Collection<Snowflake, Message>;
     let totalMessages = 0;
-    const options: ChannelLogsQueryOptions = {limit: 100};
+    const options: FetchMessagesOptions = {limit: 100};
     do {
       try {
         messages = await this.channel.messages.fetch(options);

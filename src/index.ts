@@ -1,4 +1,4 @@
-import {Client} from 'discord.js'
+import {Client, GatewayIntentBits, Partials} from 'discord.js'
 import {lex} from './lexer'
 import {ClientError, logClientError, log} from './error'
 import {CommandSpec, FlagSpec, parseCommand} from './command'
@@ -20,7 +20,21 @@ let config: Config = {
   prefix: '',
 }
 
-const client = new Client({ partials: ['CHANNEL', 'MESSAGE', 'REACTION'] });
+const client = new Client({
+  intents: [
+    GatewayIntentBits.Guilds,
+    GatewayIntentBits.MessageContent,
+    GatewayIntentBits.GuildMessages,
+    GatewayIntentBits.GuildMessageReactions,
+    GatewayIntentBits.DirectMessages,
+    GatewayIntentBits.DirectMessageReactions,
+  ],
+  partials: [
+    Partials.Channel,
+    Partials.Message,
+    Partials.Reaction,
+  ],
+});
 const sealer = new Sealer();
 const aggregators = new Aggregators();
 const voiceManager = new VoiceManager();
@@ -93,11 +107,11 @@ client.on('messageDelete', async(message) => {
   }
 });
 
-client.on('ready', () => {
+client.once('ready', () => {
   log('I am ready!');
 });
 
-client.on('message', async (message) => {
+client.on('messageCreate', async (message) => {
   // We never expect new messages to be partial messages
   if (message.partial) {
     return;

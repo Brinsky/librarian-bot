@@ -129,8 +129,7 @@ export default class Sealer {
     await voteMessage.react(APPROVE_REACT);
 
     const voteCollector = voteMessage.createReactionCollector(
-      createFilter(APPROVE_REACT, userIdSet),
-      { max: users.length, time: HOUR_MS, dispose: true });
+      { filter: createFilter(APPROVE_REACT, userIdSet), max: users.length, time: HOUR_MS, dispose: true });
 
     let pendingEditsPromise: Promise<void> = Promise.resolve();
 
@@ -176,8 +175,7 @@ export default class Sealer {
 
     const countdownCollector =
       countdownMessage.createReactionCollector(
-        createFilter(CANCEL_REACT, userIdSet),
-        { max: 1, time: THIRTY_SEC_MS });
+        { filter: createFilter(CANCEL_REACT, userIdSet), max: 1, time: THIRTY_SEC_MS });
 
     let cancelledBy: User|null = null;
     countdownCollector.on('collect', (reaction, user): void => {

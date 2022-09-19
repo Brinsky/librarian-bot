@@ -137,7 +137,7 @@ export async function readJsonFile<T>(filePath: string): Promise<T> {
  * Returns a promise that resolves when the provided collector emits an 'end'
  * event.
  */
-export function awaitCollectorEnd<K, V>(collector: Collector<K, V>): Promise<void> {
+export function awaitCollectorEnd<K, V, F extends unknown[]>(collector: Collector<K, V, F>): Promise<void> {
   return new Promise((resolve): void => {
     collector.on('end', (): void => {
       resolve();
