@@ -130,7 +130,7 @@ client.on('message', async (message) => {
   try {
     await commandSpec.command(
       parseCommand(commandSpec, tokens), message, client);
-  } catch (err) {
+  } catch (err: unknown) {
     if (err instanceof ClientError) {
       logClientError(message, err.message);
       if (err.internalMessage != null) {
@@ -139,7 +139,7 @@ client.on('message', async (message) => {
     } else {
       logClientError(
         message, 'Failed to execute command due to an internal error');
-      log(err);
+      log(err as string);
     }
   }
 });
@@ -150,7 +150,7 @@ function init(): void {
   try {
     config = 
       JSON.parse(fs.readFileSync('data/config.json').toString()) as Config
-  } catch (err) {
+  } catch (err: unknown) {
     log('Failed to read configuration file; shutting down');
     return;
   }

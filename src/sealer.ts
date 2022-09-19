@@ -76,8 +76,8 @@ export default class Sealer {
     try {
       envelope =
           await this.getFirstMatch(assertNonNull(message.author).id, title);
-    } catch (err) {
-      throw new ClientError('Error while accessing database', err);
+    } catch (err: unknown) {
+      throw new ClientError('Error while accessing database', err as string);
     }
     if (envelope) {
       throw new ClientError(`Envelope with title "${title}" already exists`);
@@ -92,7 +92,7 @@ export default class Sealer {
       });
       indicateSuccess(message);
     } catch(err) {
-      throw new ClientError('Unable to write envelope to database', err);
+      throw new ClientError('Unable to write envelope to database', err as string);
     }
   }
 
@@ -104,8 +104,8 @@ export default class Sealer {
     try {
       envelope = 
           await this.getFirstMatch(assertNonNull(message.author).id, title);
-    } catch (err) {
-      throw new ClientError('Error while accessing database', err);
+    } catch (err: unknown) {
+      throw new ClientError('Error while accessing database', err as string);
     }
 
     if (envelope) {
@@ -220,8 +220,8 @@ export default class Sealer {
         throw new ClientError(`User with ID ${authorId} has no envelopes`);
       }
       return envelopes[0];
-    } catch (err) {
-      throw new ClientError('Error while accessing database', err);
+    } catch (err: unknown) {
+      throw new ClientError('Error while accessing database', err as string);
     }
   }
 

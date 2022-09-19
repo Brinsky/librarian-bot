@@ -62,8 +62,8 @@ export class Aggregators {
       const channelId = flagsAndArgs.flags.get('-c')!;
       try {
         channel = await client.channels.fetch(channelId);
-      } catch (err) {
-        throw new ClientError(`Unknown channel ${channelId}`, err);
+      } catch (err: unknown) {
+        throw new ClientError(`Unknown channel ${channelId}`, err as string);
       }
     } else {
       channel = message.channel;
@@ -200,7 +200,7 @@ class Aggregator {
   public async buildCache(): Promise<void> {
     try {
       await this.buildCacheInternal();
-    } catch (err) {
+    } catch (err: unknown) {
       // Don't leave this aggregator in a broken state
       this.messageIdsToEmojis.clear();
       this.eventQueue.length = 0; // Clears the array
@@ -227,7 +227,7 @@ class Aggregator {
     do {
       try {
         messages = await this.channel.messages.fetch(options);
-      } catch (err) {
+      } catch (err: unknown) {
         // log error, clear cache, etc.
         this.buildingCache = false;
         return;
@@ -277,13 +277,13 @@ class Aggregator {
       case EventType.DELETE_MSG:
         try {
           this.messageIdsToEmojis.deleteA(event.msgId);
-        } catch (err) {
+        } catch (err: unknown) {
           // Under the current implementation, messages with no reactions
           // won't be in the map.
           //
           // It's possible the message was deleted before buildCache
           // fetched it - in that case it also won't be in the map.
-          log('(Probably safe to ignore)' + err);
+          log('(Probably safe to ignore)' + (err as string));
         }
         break;
     }

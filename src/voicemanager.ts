@@ -46,8 +46,8 @@ export default class VoiceManager {
       const channelId = flagsAndArgs.flags.get('-c')!;
       try {
         voiceChannel = await client.channels.fetch(channelId);
-      } catch (err) {
-        throw new ClientError(`Unknown channel ${channelId}`, err);
+      } catch (err: unknown) {
+        throw new ClientError(`Unknown channel ${channelId}`, err as string);
       }
 
       if (!(voiceChannel instanceof VoiceChannel)) {
@@ -78,8 +78,8 @@ export default class VoiceManager {
     try {
       this.connection = await voiceChannel.join();
       indicateSuccess(message);
-    } catch (err) {
-      throw new ClientError('Could not connect to voice channel', err);
+    } catch (err: unknown) {
+      throw new ClientError('Could not connect to voice channel', err as string);
     }
   }
 
@@ -107,9 +107,9 @@ export default class VoiceManager {
     // doesn't, but we want to inform the user)
     try {
       await stat(trackPath);
-    } catch (err) {
+    } catch (err: unknown) {
       throw new ClientError('Requested audio file not found: ' + fileName);
-      log(err);
+      log(err as string);
       return;
     }
 
@@ -151,8 +151,8 @@ export default class VoiceManager {
     }
     try {
       await Promise.all(reactPromises);
-    } catch (err) {
-      log('Failed to react with one or more emojis: ' + err);
+    } catch (err: unknown) {
+      log('Failed to react with one or more emojis: ' + err as string);
     }
 
     const filterFunc = (reaction: MessageReaction) => {
@@ -165,8 +165,13 @@ export default class VoiceManager {
     const playTrackFunc = async (reaction: MessageReaction) => {
       try {
         await this.playTrack(reaction.emoji.name);
-      } catch (err) {
-        logClientError(message, err.message);
+      } catch (err: unknown) {
+        if (err instanceof Error) {
+          logClientError(message, err.message);
+	} else {
+          logClientError(message, 'Failed to play track');
+	  log(err as string);
+	}
       }
     };
     collector.on('collect', playTrackFunc);
@@ -184,8 +189,8 @@ export default class VoiceManager {
     try {
       // May fail if bot doesn't have a role w/ "Manage Messages" privilege
       await boardMsg.reactions.removeAll();
-    } catch (err) {
-      log(err);
+    } catch (err: unknown) {
+      log(err as string);
     }
   }
 

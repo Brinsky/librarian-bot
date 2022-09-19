@@ -60,7 +60,7 @@ export async function fetchUsers(
     try {
       users.push(await client.users.fetch(id));
     } catch(err) {
-      throw new ClientError(`Failed to find user with ID ${id}`, err);
+      throw new ClientError(`Failed to find user with ID ${id}`, err as string);
     }
 
     // Ensure each user is specified only once
