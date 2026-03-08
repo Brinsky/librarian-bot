@@ -5,6 +5,7 @@ import {CommandSpec, FlagSpec, parseCommand} from './command'
 import {emojify, utf} from './emojifier'
 import Sealer from './sealer'
 import {picker} from './picker'
+import {help} from './help'
 import {Aggregators, EventType} from './aggregator'
 import VoiceManager from './voicemanager'
 import * as fs from 'fs'
@@ -40,29 +41,38 @@ const aggregators = new Aggregators();
 const voiceManager = new VoiceManager();
 
 const COMMANDS: ReadonlyMap<string, CommandSpec> = new Map([
-  ['emojify', new CommandSpec(emojify, [], 1)],
-  ['utf', new CommandSpec(utf, [], 1)],
-  ['seal', new CommandSpec(sealer.seal.bind(sealer), [], 2, 2)],
-  ['unseal', new CommandSpec(sealer.unseal.bind(sealer), [], 1, 1)],
-  ['vote', new CommandSpec(sealer.vote.bind(sealer), [], 1, -1)],
-  ['picker', new CommandSpec(picker, [new FlagSpec('-s', false)], 1, -1)],
+  ['emojify', new CommandSpec(emojify, 'Replaces characters with emojis', [], 1, -1, '<text>')],
+  ['utf', new CommandSpec(utf, 'Prints the UTF-16 hex encoding of a string', [], 1, -1, '<text>')],
+  ['seal', new CommandSpec(sealer.seal.bind(sealer), 'Seal a secrete envelope to be unsealed at a later time', [], 2, 2, '<title> <content>')],
+  ['unseal', new CommandSpec(sealer.unseal.bind(sealer), 'Unseal a previously sealed envelopes', [], 1, 1, '<title>')],
+  ['vote', new CommandSpec(sealer.vote.bind(sealer), 'Start a vote to unseal envelopes', [], 1, -1, '<@users...>')],
+  ['picker', new CommandSpec(picker, 'Randomly pick an option from a list', [new FlagSpec('-s', 'Shuffle and return all options completely', false)], 1, -1, '<options...>')],
   [
     'aggregate',
     new CommandSpec(
       aggregators.aggregate.bind(aggregators),
-      [new FlagSpec('-c', true), new FlagSpec('-s', true), new FlagSpec('-e', true), new FlagSpec('-r', false)], 1, 1)
+      'Search for all messages with a given react',
+      [
+        new FlagSpec('-c', 'Channel ID to use instead of the current one', true),
+        new FlagSpec('-s', 'Start date to bound the aggregation. Attempts to parse "natural language" dates - see https://github.com/wanasit/chrono.', true),
+        new FlagSpec('-e', 'End date to bound the aggregation', true),
+        new FlagSpec('-r', 'Force rebuilding of the cache for the channel', false)
+      ], 1, 1, '<emoji>')
   ],
   [
     'vjoin',
     new CommandSpec(
-      voiceManager.vjoin.bind(voiceManager), [new FlagSpec('-c', true)], 0, 0)
+      voiceManager.vjoin.bind(voiceManager),
+      'Have the bot join a voice channel',
+      [new FlagSpec('-c', 'Voice channel ID to join', true)], 0, 0)
   ],
   [
     'vleave', 
-    new CommandSpec(voiceManager.vleave.bind(voiceManager), [], 0, 0)
+    new CommandSpec(voiceManager.vleave.bind(voiceManager), 'Have the bot leave the current voice channel', [], 0, 0)
   ],
-  ['vplay', new CommandSpec(voiceManager.vplay.bind(voiceManager), [], 1, 1)],
-  ['board', new CommandSpec(voiceManager.board.bind(voiceManager), [], 0, 0)],
+  ['vplay', new CommandSpec(voiceManager.vplay.bind(voiceManager), 'Have the bot play an audio file from the soundboard in its current voice channel', [], 1, 1, '<emoji>')],
+  ['board', new CommandSpec(voiceManager.board.bind(voiceManager), 'Display the interactive soundboard', [], 0, 0)],
+  ['help', new CommandSpec((f, m) => help(COMMANDS, f, m), 'List all available commands, their descriptions, and support flags', [], 0, 0)],
 ]);
 
 /////////// Event-handling code ///////////

@@ -4,7 +4,10 @@ import {pluralize} from './util'
 import {ClientError} from './error'
 
 export class FlagSpec {
-  public constructor(readonly name: string, readonly hasArg: boolean) {}
+  public constructor(
+    readonly name: string,
+    readonly description: string,
+    readonly hasArg: boolean) {}
 }
 
 export class FlagsAndArgs {
@@ -21,8 +24,12 @@ export class CommandSpec {
   public readonly flagSpecMap: Map<string, FlagSpec>;
 
   public constructor(
-    readonly command: Command, flagSpecs: FlagSpec[] = [],
-    readonly minArgs: number = 0, readonly maxArgs: number = -1) {
+    readonly command: Command,
+    readonly description: string,
+    flagSpecs: FlagSpec[] = [],
+    readonly minArgs: number = 0,
+    readonly maxArgs: number = -1,
+    readonly argUsage: string = '') {
     if (!Number.isInteger(this.minArgs) || this.minArgs < 0) {
       throw new Error('minArgs must be an integer >= 0');
     }
