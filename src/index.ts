@@ -45,7 +45,7 @@ const COMMANDS: ReadonlyMap<string, CommandSpec> = new Map([
   ['seal', new CommandSpec(sealer.seal.bind(sealer), [], 2, 2)],
   ['unseal', new CommandSpec(sealer.unseal.bind(sealer), [], 1, 1)],
   ['vote', new CommandSpec(sealer.vote.bind(sealer), [], 1, -1)],
-  ['picker', new CommandSpec(picker, [], 1, -1)],
+  ['picker', new CommandSpec(picker, [new FlagSpec('-s', false)], 1, -1)],
   [
     'aggregate',
     new CommandSpec(

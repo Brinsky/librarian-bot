@@ -7,3 +7,4 @@ data/**/*
 !data/music
 data/music/**/*
 !data/music/fakefile.wav
+.vscode/

@@ -1,12 +1,19 @@
 import {Message} from 'discord.js'
 import {FlagsAndArgs} from './command'
-import {randomInt} from './util'
+import {randomInt, shuffle} from './util'
 
 export async function picker(
   flagsAndArgs: FlagsAndArgs, message: Message): Promise<void> {
-  const pickedIndex = randomInt(0, flagsAndArgs.args.length);
   if (!('send' in message.channel)) {
     return;
   }
-  message.channel.send(`I picker ${flagsAndArgs.args[pickedIndex]}!`);
+
+  if (flagsAndArgs.flags.has('-s')) {
+    const shuffledArgs = [...flagsAndArgs.args];
+    shuffle(shuffledArgs);
+    message.channel.send(`I picker ${shuffledArgs.join(', ')}`);
+  } else {
+    const pickedIndex = randomInt(0, flagsAndArgs.args.length);
+    message.channel.send(`I picker ${flagsAndArgs.args[pickedIndex]}!`);
+  }
 }
