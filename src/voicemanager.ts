@@ -160,6 +160,9 @@ export default class VoiceManager {
 
   private async boardInternal(message: Message): Promise<void> {
     const boardMsgText = buildSoundboardMessage(this.trackMap);
+    if (!('send' in message.channel)) {
+      return;
+    }
     const boardMsg =
       await message.channel.send(boardMsgText + '\n\n*Initializing...*');
 

@@ -4,6 +4,9 @@ import {randomInt} from './util'
 
 export async function picker(
   flagsAndArgs: FlagsAndArgs, message: Message): Promise<void> {
-  const pickedIndex = randomInt(0, flagsAndArgs.args.length); 
+  const pickedIndex = randomInt(0, flagsAndArgs.args.length);
+  if (!('send' in message.channel)) {
+    return;
+  }
   message.channel.send(`I picker ${flagsAndArgs.args[pickedIndex]}!`);
 }

@@ -63,6 +63,9 @@ function emojifyText(text: string): string {
 export async function emojify(
   flagsAndArgs: FlagsAndArgs, message: Message): Promise<void> {
   const args = flagsAndArgs.args;
+  if (!('send' in message.channel)) {
+    return;
+  }
   for (let i = 0; i < args.length; i++) {
     message.channel.send(emojifyText(args[i]));
   }

@@ -114,6 +114,9 @@ export class Aggregators {
     originalMsg: Message,
     rawEmoji: string,
     messages: Message[]): Promise<void> {
+    if (!('send' in originalMsg.channel)) {
+      return;
+    }
     originalMsg.channel.send(
       `Found ${messages.length} ${rawEmoji} ` +
         `${pluralize(messages.length, 'reaction')}: `

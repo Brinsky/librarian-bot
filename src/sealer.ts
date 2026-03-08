@@ -109,6 +109,9 @@ export default class Sealer {
     }
 
     if (envelope) {
+      if (!('send' in message.channel)) {
+        return;
+      }
       message.channel.send(`Unsealing "${envelope.title}" from `
           + `${envelope.time}:\n${envelope.content}`);
     } else {
@@ -124,6 +127,10 @@ export default class Sealer {
     const userIdSet = new Set(users.map((user): string => user.id));
     const envelopes: Map<string, Envelope> = new Map();
 
+    if (!('send' in message.channel)) {
+      return;
+    }
+
     const voteMessage = 
       await message.channel.send(buildVoteMessage(users, envelopes));
     await voteMessage.react(APPROVE_REACT);
@@ -133,7 +140,7 @@ export default class Sealer {
 
     let pendingEditsPromise: Promise<void> = Promise.resolve();
 
-    voteCollector.on('collect', (reaction, user): void => {
+    voteCollector.on('collect', (reaction: MessageReaction, user: User): void => {
       pendingEditsPromise = 
         pendingEditsPromise
           .then((): Promise<Envelope> => this.getLatestEnvelope(user.id))
@@ -144,7 +151,7 @@ export default class Sealer {
           .then();
     });
 
-    voteCollector.on('remove', (reaction, user): void => {
+    voteCollector.on('remove', (reaction: MessageReaction, user: User): void => {
       pendingEditsPromise = 
         pendingEditsPromise
           .then((): Promise<Message> => {
@@ -178,7 +185,7 @@ export default class Sealer {
         { filter: createFilter(CANCEL_REACT, userIdSet), max: 1, time: THIRTY_SEC_MS });
 
     let cancelledBy: User|null = null;
-    countdownCollector.on('collect', (reaction, user): void => {
+    countdownCollector.on('collect', (reaction: MessageReaction, user: User): void => {
       cancelledBy = user;
     });
 

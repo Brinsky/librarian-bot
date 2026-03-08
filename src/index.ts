@@ -107,7 +107,7 @@ client.on('messageDelete', async(message) => {
   }
 });
 
-client.once('ready', () => {
+client.once('clientReady', () => {
   log('I am ready!');
 });
 
