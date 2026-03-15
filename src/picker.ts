@@ -1,6 +1,6 @@
 import { SlashCommandBuilder, ChatInputCommandInteraction } from 'discord.js';
 import { SlashCommand } from './command';
-import { randomInt, shuffle } from './util';
+import { randomInt, shuffle, splitMessage } from './util';
 
 export const picker: SlashCommand = {
   data: new SlashCommandBuilder()
@@ -24,12 +24,19 @@ export const picker: SlashCommand = {
       return;
     }
 
+    let output = '';
     if (doShuffle) {
       shuffle(args);
-      await interaction.reply(`I picker ${args.join(', ')}`);
+      output = `I picked ${args.join(', ')}`;
     } else {
       const pickedIndex = randomInt(0, args.length);
-      await interaction.reply(`I picker ${args[pickedIndex]}!`);
+      output = `I picked ${args[pickedIndex]}!`;
+    }
+
+    const chunks = splitMessage(output);
+    await interaction.reply({ content: chunks[0] });
+    for (let i = 1; i < chunks.length; i++) {
+        await interaction.followUp({ content: chunks[i] });
     }
   }
 };

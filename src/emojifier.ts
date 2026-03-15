@@ -1,5 +1,6 @@
 import { SlashCommandBuilder, ChatInputCommandInteraction } from 'discord.js';
 import { SlashCommand } from './command';
+import { splitMessage } from './util';
 
 const EMOJI_MAP: ReadonlyMap<string, string> = new Map([
   ['a', '\ud83c\udde6'],
@@ -71,7 +72,12 @@ export const emojify: SlashCommand = {
     ),
   async execute(interaction: ChatInputCommandInteraction) {
     const text = interaction.options.getString('text', true);
-    await interaction.reply(emojifyText(text));
+    const chunks = splitMessage(emojifyText(text));
+    
+    await interaction.reply({ content: chunks[0] });
+    for (let i = 1; i < chunks.length; i++) {
+      await interaction.followUp({ content: chunks[i] });
+    }
   }
 };
 
@@ -98,6 +104,11 @@ export const utf: SlashCommand = {
       }
       allEncoded.push(encoded.join(''));
     }
-    await interaction.reply(allEncoded.join(' '));
+    
+    const chunks = splitMessage(allEncoded.join(' '));
+    await interaction.reply({ content: chunks[0] });
+    for (let i = 1; i < chunks.length; i++) {
+      await interaction.followUp({ content: chunks[i] });
+    }
   }
 };

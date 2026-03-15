@@ -2,7 +2,7 @@ import Datastore from 'nedb-promises'
 import { Client, Collector, Message, MessageReaction, User, SlashCommandBuilder, ChatInputCommandInteraction } from 'discord.js'
 import { SlashCommand } from './command'
 import { ClientError, indicateSuccess } from './error'
-import { assertNonNull, awaitCollectorEnd, fetchUsers, mentionToId, shuffle } from './util'
+import { assertNonNull, awaitCollectorEnd, fetchUsers, mentionToId, shuffle, splitMessage } from './util'
 
 interface Envelope {
   readonly author: string;
@@ -118,7 +118,11 @@ export default class Sealer {
       }
 
       if (envelope) {
-        await interaction.reply(`Unsealing "${envelope.title}" from ${envelope.time}:\n${envelope.content}`);
+        const chunks = splitMessage(`Unsealing "${envelope.title}" from ${envelope.time}:\n${envelope.content}`);
+        await interaction.reply({ content: chunks[0] });
+        for (let i = 1; i < chunks.length; i++) {
+          await interaction.followUp({ content: chunks[i] });
+        }
       } else {
         throw new ClientError(`No envelope found with title "${title}"`);
       }
@@ -145,7 +149,11 @@ export default class Sealer {
       }
 
       const listText = envelopes.map(e => `- **${e.title}** (sealed on ${e.time})`).join('\n');
-      await interaction.reply({ content: `**Your Sealed Envelopes:**\n${listText}` });
+      const chunks = splitMessage(`**Your Sealed Envelopes:**\n${listText}`);
+      await interaction.reply({ content: chunks[0] });
+      for (let i = 1; i < chunks.length; i++) {
+        await interaction.followUp({ content: chunks[i] });
+      }
     }
   };
 
@@ -254,7 +262,10 @@ export default class Sealer {
       }
 
       for (const unsealMessage of unsealMessages) {
-        await channel.send(unsealMessage);
+        const chunks = splitMessage(unsealMessage);
+        for (const chunk of chunks) {
+          await channel.send({ content: chunk });
+        }
       }
     }
   };

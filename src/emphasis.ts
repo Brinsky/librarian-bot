@@ -1,5 +1,6 @@
 import { SlashCommandBuilder, ChatInputCommandInteraction } from 'discord.js';
 import { SlashCommand } from './command';
+import { splitMessage } from './util';
 
 const MAX_OUTPUT_SENTENCES = 30;
 
@@ -31,6 +32,11 @@ export const emphasis: SlashCommand = {
     }
 
     const output = emphasizedSentences.join('\n');
-    await interaction.reply({ content: output });
+    const chunks = splitMessage(output);
+    
+    await interaction.reply({ content: chunks[0] });
+    for (let i = 1; i < chunks.length; i++) {
+      await interaction.followUp({ content: chunks[i] });
+    }
   }
 };

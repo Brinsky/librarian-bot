@@ -31,7 +31,7 @@ describe('picker', () => {
     expect(mockReply).toHaveBeenCalledTimes(1);
     const sentMessage = mockReply.calls.mostRecent().args[0];
 
-    expect(sentMessage).toMatch(/^I picker [ABC]!$/);
+    expect(sentMessage.content).toMatch(/^I picked [ABC]!$/);
   });
 
   it('shuffles and returns all options when shuffle is provided', async () => {
@@ -43,9 +43,9 @@ describe('picker', () => {
     expect(mockReply).toHaveBeenCalledTimes(1);
     const sentMessage = mockReply.calls.mostRecent().args[0];
 
-    expect(typeof sentMessage).toBe('string');
-    expect(sentMessage).toMatch(/^I picker /);
-    const resultString = sentMessage.substring('I picker '.length);
+    expect(typeof sentMessage.content).toBe('string');
+    expect(sentMessage.content).toMatch(/^I picked /);
+    const resultString = sentMessage.content.substring('I picked '.length);
     const results = resultString.split(', ');
 
     expect(results.length).toBe(3);

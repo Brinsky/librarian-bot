@@ -1,6 +1,6 @@
-import {Client, Collector, Message, User} from 'discord.js'
-import {ClientError} from './error'
-import {promisify} from 'util'
+import { Client, Collector, Message, User } from 'discord.js'
+import { ClientError } from './error'
+import { promisify } from 'util'
 import * as fs from 'fs'
 
 const readFile = promisify(fs.readFile);
@@ -37,7 +37,7 @@ export function shuffle<T>(array: T[]): void {
  * Returns the given object unmodified if the object is neither undefined nor
  * null. Otherwise, throws an error.
  */
-export function assertNonNull<T>(t: T|null): T {
+export function assertNonNull<T>(t: T | null): T {
   if (t !== null) {
     return t;
   } else {
@@ -55,11 +55,11 @@ export async function fetchUsers(
   const users: User[] = [];
   const userIdSet: Set<string> = new Set();
 
-  for(const id of ids) {
+  for (const id of ids) {
     // Ensure each ID corresponds to a real user
     try {
       users.push(await client.users.fetch(id));
-    } catch(err) {
+    } catch (err) {
       throw new ClientError(`Failed to find user with ID ${id}`, err as string);
     }
 
@@ -84,7 +84,7 @@ const MENTION_PATTERN = /<@!?(\d+)>/;
  */
 export function mentionToId(mention: string): string {
   const match = mention.match(MENTION_PATTERN);
-  if (match === null || match.length !== 2) { 
+  if (match === null || match.length !== 2) {
     throw new ClientError(
       `Unrecognized argument ${mention}. Expected an @ tag`);
   }
@@ -99,7 +99,7 @@ export async function markComplete(
   msg: Message, client: Client): Promise<void> {
   // Refetch the message from the channel to get the latest reactions.
   // For some reason msg.fetch() doesn't seem to do this.
-  msg = await msg.channel.messages.fetch(msg.id); 
+  msg = await msg.channel.messages.fetch(msg.id);
 
   const existing = msg.reactions.cache.find((r) => r.emoji.name === '\u231B');
   if (existing && client.user) {
@@ -144,3 +144,44 @@ export function awaitCollectorEnd<K, V, F extends unknown[]>(collector: Collecto
     });
   });
 }
+
+export const MAX_ALLOWED_CHARS = 2000;
+export const CHUNK_ALLOWED_CHARS = 1900;
+
+/**
+ * Splits a string into an array of smaller strings under the character limit.
+ * Used to send long outputs without hitting the Discord 2000 char threshold.
+ *
+ * - If the message <= 2000 chars, it is returned unchanged as the sole element.
+ * - Otherwise, chunks are carved at the last newline before index 1900 (or at 1900 arbitrarily if no newline).
+ * - Pre-pends pagination headers to all split chunks
+ */
+export function splitMessage(text: string): string[] {
+  if (text.length <= MAX_ALLOWED_CHARS) {
+    return [text];
+  }
+
+  const chunks: string[] = [];
+  let remaining = text;
+
+  while (remaining.length > 0) {
+    if (remaining.length <= CHUNK_ALLOWED_CHARS) {
+      chunks.push(remaining);
+      break;
+    }
+
+    const searchSpace = remaining.substring(0, CHUNK_ALLOWED_CHARS);
+    const splitIndex = searchSpace.lastIndexOf('\n');
+
+    if (splitIndex === -1) {
+      chunks.push(remaining.substring(0, CHUNK_ALLOWED_CHARS));
+      remaining = remaining.substring(CHUNK_ALLOWED_CHARS);
+    } else {
+      chunks.push(remaining.substring(0, splitIndex));
+      remaining = remaining.substring(splitIndex + 1);
+    }
+  }
+
+  return chunks.map((chunk, i) => `*${i + 1}/${chunks.length}:*\n${chunk}`);
+}
+
