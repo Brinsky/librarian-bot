@@ -15,11 +15,8 @@
 5. **Conversation Context Grouping**
    - Enhance `/aggregate` to group nearby messages from the same conversation to preserve context, rather than treating every message as an isolated entry.
 
-6. **The Emphasis Exercise**
-   - A command that takes a sentence and outputs it $N$ times (where $N$ is the number of words), with the italics moving to the next word in each subsequent line.
-
-7. **Coin Jars**
+6. **Coin Jars**
    - A database-backed system for "jars" (string names associated with an integer count). Users should be able to list all available jars and increment the count for any jar at any time.
 
-8. **Archeology**
+7. **Archeology**
    - Select a random post from the entire history of the given channel and "quote" / link to it

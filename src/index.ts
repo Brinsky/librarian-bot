@@ -4,6 +4,7 @@ import { SlashCommand } from './command'
 import { emojify, utf } from './emojifier'
 import Sealer from './sealer'
 import { picker } from './picker'
+import { emphasis } from './emphasis'
 import { Aggregators, EventType } from './aggregator'
 import VoiceManager from './voicemanager'
 import * as fs from 'fs'
@@ -49,6 +50,7 @@ const commandsList: SlashCommand[] = [
   sealer.voteCommand,
   sealer.listCommand,
   picker,
+  emphasis,
   aggregators.aggregateCommand,
   voiceManager.vjoinCommand,
   voiceManager.vleaveCommand,
