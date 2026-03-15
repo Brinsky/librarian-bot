@@ -21,8 +21,5 @@
 7. **Coin Jars**
    - A database-backed system for "jars" (string names associated with an integer count). Users should be able to list all available jars and increment the count for any jar at any time.
 
-8. **Sealed Envelope Library**
-   - Allow users to list the titles and metadata (e.g., seal date, status) of all envelopes they have previously created.
-
-9. **Archeology**
+8. **Archeology**
    - Select a random post from the entire history of the given channel and "quote" / link to it

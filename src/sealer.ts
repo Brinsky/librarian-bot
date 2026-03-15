@@ -1,8 +1,8 @@
 import Datastore from 'nedb-promises'
-import {Client, Collector, Message, MessageReaction, User, SlashCommandBuilder, ChatInputCommandInteraction} from 'discord.js'
-import {SlashCommand} from './command'
-import {ClientError, indicateSuccess} from './error'
-import {assertNonNull, awaitCollectorEnd, fetchUsers, mentionToId, shuffle} from './util'
+import { Client, Collector, Message, MessageReaction, User, SlashCommandBuilder, ChatInputCommandInteraction } from 'discord.js'
+import { SlashCommand } from './command'
+import { ClientError, indicateSuccess } from './error'
+import { assertNonNull, awaitCollectorEnd, fetchUsers, mentionToId, shuffle } from './util'
 
 interface Envelope {
   readonly author: string;
@@ -17,7 +17,7 @@ const APPROVE_REACT = '\u2611'; // "Ballot box with check emoji"
 const CANCEL_REACT = '\uD83D\uDEAB'; // "No entry sign emoji"
 
 function createFilter(
-  emojiName: string, 
+  emojiName: string,
   userIds: Set<string>): (r: MessageReaction, u: User) => boolean {
   return (reaction: MessageReaction, user: User): boolean => {
     return reaction.emoji.name === emojiName && userIds.has(user.id);
@@ -62,7 +62,7 @@ export default class Sealer {
     });
 
     this.database.insert
-  } 
+  }
   public readonly sealCommand: SlashCommand = {
     data: new SlashCommandBuilder()
       .setName('seal')
@@ -77,7 +77,8 @@ export default class Sealer {
         throw new ClientError('Title length exceeds 20 characters');
       }
 
-      let envelope: Envelope|null;
+      // Ensure the author doesn't already own an envelope with the same name
+      let envelope: Envelope | null;
       try {
         envelope = await this.getFirstMatch(interaction.user.id, title);
       } catch (err: unknown) {
@@ -94,8 +95,8 @@ export default class Sealer {
           content: content,
           time: new Date(),
         });
-        await interaction.reply({ content: 'Envelope sealed!', ephemeral: true });
-      } catch(err) {
+        await interaction.reply({ content: 'Envelope sealed!' });
+      } catch (err) {
         throw new ClientError('Unable to write envelope to database', err as string);
       }
     }
@@ -109,7 +110,7 @@ export default class Sealer {
     execute: async (interaction: ChatInputCommandInteraction) => {
       const title = interaction.options.getString('title', true);
 
-      let envelope: Envelope|null;
+      let envelope: Envelope | null;
       try {
         envelope = await this.getFirstMatch(interaction.user.id, title);
       } catch (err: unknown) {
@@ -124,11 +125,35 @@ export default class Sealer {
     }
   };
 
+  public readonly listCommand: SlashCommand = {
+    data: new SlashCommandBuilder()
+      .setName('envelopes')
+      .setDescription('List your previously sealed envelopes'),
+    execute: async (interaction: ChatInputCommandInteraction) => {
+      let envelopes: Envelope[];
+      try {
+        envelopes = await this.database
+          .find<Envelope>({ author: interaction.user.id })
+          .sort({ time: -1 });
+      } catch (err: unknown) {
+        throw new ClientError('Error while accessing database', err as string);
+      }
+
+      if (envelopes.length === 0) {
+        await interaction.reply({ content: 'You haven\'t sealed any envelopes yet!' });
+        return;
+      }
+
+      const listText = envelopes.map(e => `- **${e.title}** (sealed on ${e.time})`).join('\n');
+      await interaction.reply({ content: `**Your Sealed Envelopes:**\n${listText}` });
+    }
+  };
+
   public readonly voteCommand: SlashCommand = {
     data: new SlashCommandBuilder()
       .setName('vote')
       .setDescription('Start a vote to unseal envelopes')
-      .addStringOption(option => 
+      .addStringOption(option =>
         option.setName('mentions')
           .setDescription('Mentions of users to include in the vote (space separated)')
           .setRequired(true)),
@@ -157,7 +182,7 @@ export default class Sealer {
       let pendingEditsPromise: Promise<void> = Promise.resolve();
 
       voteCollector.on('collect', (reaction: MessageReaction, user: User): void => {
-        pendingEditsPromise = 
+        pendingEditsPromise =
           pendingEditsPromise
             .then((): Promise<Envelope> => this.getLatestEnvelope(user.id))
             .then((envelope): Promise<Message> => {
@@ -168,7 +193,7 @@ export default class Sealer {
       });
 
       voteCollector.on('remove', (reaction: MessageReaction, user: User): void => {
-        pendingEditsPromise = 
+        pendingEditsPromise =
           pendingEditsPromise
             .then((): Promise<Message> => {
               envelopes.delete(user.id);
@@ -180,6 +205,9 @@ export default class Sealer {
       await awaitCollectorEnd(voteCollector);
       await pendingEditsPromise;
 
+      // We use envelopes.size instead of examining voteCollector.collected
+      // because the count for a given reaction includes reacts that didn't
+      // pass the filter.
       if (envelopes.size < users.length) {
         throw new ClientError(
           `Only received ${envelopes.size} out of ${users.length} responses `
@@ -187,9 +215,9 @@ export default class Sealer {
       }
 
       const countdownMessage = await channel.send(
-        'All approvals received!\\n'
+        'All approvals received!\n'
         + '**Envelopes will be unsealed in 30 seconds '
-        + `unless a user reacts to this message with ${CANCEL_REACT}.**\\n`
+        + `unless a user reacts to this message with ${CANCEL_REACT}.**\n`
         + `I will also react with ${CANCEL_REACT} for convenience.`);
       await countdownMessage.react(CANCEL_REACT);
 
@@ -197,7 +225,7 @@ export default class Sealer {
         countdownMessage.createReactionCollector(
           { filter: createFilter(CANCEL_REACT, userIdSet), max: 1, time: THIRTY_SEC_MS });
 
-      let cancelledBy: User|null = null;
+      let cancelledBy: User | null = null;
       countdownCollector.on('collect', (reaction: MessageReaction, user: User): void => {
         cancelledBy = user;
       });
@@ -206,12 +234,13 @@ export default class Sealer {
       if (countdownCollector.collected.size > 0) {
         throw new ClientError(
           cancelledBy == null ?
-            'Envelope unsealing cancelled' : 
+            'Envelope unsealing cancelled' /* Shouldn't happen */ :
             `Envelope unsealing cancelled by ${cancelledBy}`);
       }
 
       shuffle(users);
 
+      // Ensure all users have an envelope before unsealing any of them
       const unsealMessages: string[] = [];
       for (const user of users) {
         const envelope = envelopes.get(user.id);
@@ -220,8 +249,8 @@ export default class Sealer {
             `Expected all users to have an envelope, but ${user} did not`);
         }
         unsealMessages.push(`Unsealing "${envelope.title}" from `
-            + `${user} on ${envelope.time}:`
-            + `\\n${envelope.content}`);
+          + `${user} on ${envelope.time}:`
+          + `\n${envelope.content}`);
       }
 
       for (const unsealMessage of unsealMessages) {
@@ -244,7 +273,7 @@ export default class Sealer {
   }
 
   private async getFirstMatch(
-    authorId: string, title: string): Promise<Envelope|null> {
+    authorId: string, title: string): Promise<Envelope | null> {
     const envelopes: Envelope[] = await this.database.find({
       author: authorId,
       title: title,

@@ -47,6 +47,7 @@ const commandsList: SlashCommand[] = [
   sealer.sealCommand,
   sealer.unsealCommand,
   sealer.voteCommand,
+  sealer.listCommand,
   picker,
   aggregators.aggregateCommand,
   voiceManager.vjoinCommand,

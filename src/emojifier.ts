@@ -64,16 +64,14 @@ export const emojify: SlashCommand = {
   data: new SlashCommandBuilder()
     .setName('emojify')
     .setDescription('Replaces characters with emojis')
-    .addStringOption(option => 
+    .addStringOption(option =>
       option.setName('text')
         .setDescription('Text to emojify')
         .setRequired(true)
     ),
   async execute(interaction: ChatInputCommandInteraction) {
     const text = interaction.options.getString('text', true);
-    const args = text.split(/\s+/);
-    const emojifiedArgs = args.map(arg => emojifyText(arg));
-    await interaction.reply(emojifiedArgs.join('\n'));
+    await interaction.reply(emojifyText(text));
   }
 };
 
@@ -84,7 +82,7 @@ export const utf: SlashCommand = {
   data: new SlashCommandBuilder()
     .setName('utf')
     .setDescription('Prints the UTF-16 hex encoding of a string')
-    .addStringOption(option => 
+    .addStringOption(option =>
       option.setName('text')
         .setDescription('Text to encode')
         .setRequired(true)
