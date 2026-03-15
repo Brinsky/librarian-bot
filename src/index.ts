@@ -1,18 +1,17 @@
-import {Client, GatewayIntentBits, Partials} from 'discord.js'
-import {lex} from './lexer'
-import {ClientError, logClientError, log} from './error'
-import {CommandSpec, FlagSpec, parseCommand} from './command'
-import {emojify, utf} from './emojifier'
+import { Client, Collection, GatewayIntentBits, Partials } from 'discord.js'
+import { ClientError, logClientError, log } from './error'
+import { SlashCommand } from './command'
+import { emojify, utf } from './emojifier'
 import Sealer from './sealer'
-import {picker} from './picker'
-import {help} from './help'
-import {Aggregators, EventType} from './aggregator'
+import { picker } from './picker'
+import { Aggregators, EventType } from './aggregator'
 import VoiceManager from './voicemanager'
 import * as fs from 'fs'
 
 interface Config {
   token: string;
   prefix: string;
+  testGuildId?: string;
 }
 
 // Will be overwritten from file at init() time
@@ -40,40 +39,25 @@ const sealer = new Sealer();
 const aggregators = new Aggregators();
 const voiceManager = new VoiceManager();
 
-const COMMANDS: ReadonlyMap<string, CommandSpec> = new Map([
-  ['emojify', new CommandSpec(emojify, 'Replaces characters with emojis', [], 1, -1, '<text>')],
-  ['utf', new CommandSpec(utf, 'Prints the UTF-16 hex encoding of a string', [], 1, -1, '<text>')],
-  ['seal', new CommandSpec(sealer.seal.bind(sealer), 'Seal a secrete envelope to be unsealed at a later time', [], 2, 2, '<title> <content>')],
-  ['unseal', new CommandSpec(sealer.unseal.bind(sealer), 'Unseal a previously sealed envelopes', [], 1, 1, '<title>')],
-  ['vote', new CommandSpec(sealer.vote.bind(sealer), 'Start a vote to unseal envelopes', [], 1, -1, '<@users...>')],
-  ['picker', new CommandSpec(picker, 'Randomly pick an option from a list', [new FlagSpec('-s', 'Shuffle and return all options completely', false)], 1, -1, '<options...>')],
-  [
-    'aggregate',
-    new CommandSpec(
-      aggregators.aggregate.bind(aggregators),
-      'Search for all messages with a given react',
-      [
-        new FlagSpec('-c', 'Channel ID to use instead of the current one', true),
-        new FlagSpec('-s', 'Start date to bound the aggregation. Attempts to parse "natural language" dates - see https://github.com/wanasit/chrono.', true),
-        new FlagSpec('-e', 'End date to bound the aggregation', true),
-        new FlagSpec('-r', 'Force rebuilding of the cache for the channel', false)
-      ], 1, 1, '<emoji>')
-  ],
-  [
-    'vjoin',
-    new CommandSpec(
-      voiceManager.vjoin.bind(voiceManager),
-      'Have the bot join a voice channel',
-      [new FlagSpec('-c', 'Voice channel ID to join', true)], 0, 0)
-  ],
-  [
-    'vleave', 
-    new CommandSpec(voiceManager.vleave.bind(voiceManager), 'Have the bot leave the current voice channel', [], 0, 0)
-  ],
-  ['vplay', new CommandSpec(voiceManager.vplay.bind(voiceManager), 'Have the bot play an audio file from the soundboard in its current voice channel', [], 1, 1, '<emoji>')],
-  ['board', new CommandSpec(voiceManager.board.bind(voiceManager), 'Display the interactive soundboard', [], 0, 0)],
-  ['help', new CommandSpec((f, m) => help(COMMANDS, f, m), 'List all available commands, their descriptions, and support flags', [], 0, 0)],
-]);
+const slashCommands = new Collection<string, SlashCommand>();
+
+const commandsList: SlashCommand[] = [
+  emojify,
+  utf,
+  sealer.sealCommand,
+  sealer.unsealCommand,
+  sealer.voteCommand,
+  picker,
+  aggregators.aggregateCommand,
+  voiceManager.vjoinCommand,
+  voiceManager.vleaveCommand,
+  voiceManager.vplayCommand,
+  voiceManager.boardCommand
+];
+
+for (const cmd of commandsList) {
+  slashCommands.set(cmd.data.name, cmd);
+}
 
 /////////// Event-handling code ///////////
 
@@ -85,7 +69,7 @@ client.on('messageReactionAdd', async (reaction, user) => {
   });
 });
 
-client.on('messageReactionRemove', async(reaction, user) => {
+client.on('messageReactionRemove', async (reaction, user) => {
   // We re-fetch the message so that we have the latest set of reactions
   // (which excludes the one being removed here)
   const message = reaction.message.partial
@@ -102,7 +86,7 @@ client.on('messageReactionRemove', async(reaction, user) => {
   }
 });
 
-client.on('messageDelete', async(message) => {
+client.on('messageDelete', async (message) => {
   // Fetching the message would result in an 'unknown message' API error
 
   const channel = message.channel;
@@ -117,52 +101,56 @@ client.on('messageDelete', async(message) => {
   }
 });
 
-client.once('clientReady', () => {
+client.once('clientReady', async () => {
   log('I am ready!');
+  try {
+    // Register commands globally or to the test guild
+    const commandsData = commandsList.map(c => c.data.toJSON ? c.data.toJSON() : c.data);
+    if (config.testGuildId) {
+      log(`Registering slash commands to test guild: ${config.testGuildId}`);
+      await client.application?.commands.set(commandsData, config.testGuildId);
+    } else {
+      log('Registering slash commands globally...');
+      await client.application?.commands.set(commandsData);
+    }
+    log('Slash commands registered successfully.');
+  } catch (error) {
+    log('Failed to register slash commands.');
+    console.error(error);
+  }
 });
 
-client.on('messageCreate', async (message) => {
-  // We never expect new messages to be partial messages
-  if (message.partial) {
-    return;
-  }
+client.on('interactionCreate', async interaction => {
+  if (!interaction.isChatInputCommand()) return;
 
-  let text = message.content;
-
-  // Only process commands with the appropriate prefix
-  if (!text.startsWith(config.prefix)) {
-    return;
-  }
-
-  // Process the text using the lexer
-  text = text.slice(config.prefix.length);
-  let tokens = lex(text);
-  if (tokens.length === 0) {
-    logClientError(message, 'No command provided');
-    return;
-  }
-
-  // Look up the requested command
-  const commandText = tokens[0].text;
-  tokens = tokens.slice(1); // Discard the command name token
-  const commandSpec = COMMANDS.get(commandText);
-  if (!commandSpec) {
-    logClientError(message, 'Unrecognized command "' + commandText + '"');
-    return;
-  }
+  const command = slashCommands.get(interaction.commandName);
+  if (!command) return;
 
   try {
-    await commandSpec.command(
-      parseCommand(commandSpec, tokens), message, client);
+    await command.execute(interaction, client);
   } catch (err: unknown) {
     if (err instanceof ClientError) {
-      logClientError(message, err.message);
+      if (interaction.replied || interaction.deferred) {
+        // If the command already successfully replied, OR if it called deferReply()
+        // to buy more time, we can no longer use .reply().
+        // We MUST use .followUp() to send the error message.
+        await interaction.followUp({ content: err.message }).catch(console.error);
+      } else {
+        // If the command crashed instantly before doing anything,
+        // the interaction hasn't been acknowledged yet.
+        // We MUST use .reply() to acknowledge it and show the error.
+        await interaction.reply({ content: err.message }).catch(console.error);
+      }
       if (err.internalMessage != null) {
         log(err.internalMessage);
       }
     } else {
-      logClientError(
-        message, 'Failed to execute command due to an internal error');
+      const msg = 'Failed to execute command due to an internal error';
+      if (interaction.replied || interaction.deferred) {
+        await interaction.followUp({ content: msg }).catch(console.error);
+      } else {
+        await interaction.reply({ content: msg }).catch(console.error);
+      }
       log(err as string);
     }
   }
@@ -172,7 +160,7 @@ client.on('messageCreate', async (message) => {
 
 function init(): void {
   try {
-    config = 
+    config =
       JSON.parse(fs.readFileSync('data/config.json').toString()) as Config
   } catch (err: unknown) {
     log('Failed to read configuration file; shutting down');

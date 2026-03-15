@@ -1,40 +1,49 @@
 import 'jasmine';
-import {picker} from '../picker';
-import {FlagsAndArgs} from '../command';
-import {Message} from 'discord.js';
+import { picker } from '../picker';
+import { ChatInputCommandInteraction } from 'discord.js';
 
 describe('picker', () => {
-  let mockMessage: any;
-  let mockSend: jasmine.Spy;
+  let mockInteraction: any;
+  let mockReply: jasmine.Spy;
+  let getStringSpy: jasmine.Spy;
+  let getBooleanSpy: jasmine.Spy;
 
   beforeEach(() => {
-    mockSend = jasmine.createSpy('send');
-    mockMessage = {
-      channel: {
-        send: mockSend
+    mockReply = jasmine.createSpy('reply');
+    getStringSpy = jasmine.createSpy('getString');
+    getBooleanSpy = jasmine.createSpy('getBoolean');
+
+    mockInteraction = {
+      reply: mockReply,
+      options: {
+        getString: getStringSpy,
+        getBoolean: getBooleanSpy,
       }
     };
   });
 
   it('picks a single random option when no flag is provided', async () => {
-    const flagsAndArgs = new FlagsAndArgs(new Map(), ['A', 'B', 'C']);
-    await picker(flagsAndArgs, mockMessage as unknown as Message);
+    getStringSpy.and.returnValue('A B C');
+    getBooleanSpy.and.returnValue(false);
 
-    expect(mockSend).toHaveBeenCalledTimes(1);
-    const sentMessage = mockSend.calls.mostRecent().args[0];
+    await picker.execute(mockInteraction as unknown as ChatInputCommandInteraction, null as any);
+
+    expect(mockReply).toHaveBeenCalledTimes(1);
+    const sentMessage = mockReply.calls.mostRecent().args[0];
 
     expect(sentMessage).toMatch(/^I picker [ABC]!$/);
   });
 
-  it('shuffles and returns all options when -s flag is provided', async () => {
-    const flags = new Map<string, string|null>([['-s', null]]);
-    const args = ['A', 'B', 'C'];
-    const flagsAndArgs = new FlagsAndArgs(flags, args);
-    await picker(flagsAndArgs, mockMessage as unknown as Message);
+  it('shuffles and returns all options when shuffle is provided', async () => {
+    getStringSpy.and.returnValue('A B C');
+    getBooleanSpy.and.returnValue(true);
 
-    expect(mockSend).toHaveBeenCalledTimes(1);
-    const sentMessage = mockSend.calls.mostRecent().args[0];
+    await picker.execute(mockInteraction as unknown as ChatInputCommandInteraction, null as any);
 
+    expect(mockReply).toHaveBeenCalledTimes(1);
+    const sentMessage = mockReply.calls.mostRecent().args[0];
+
+    expect(typeof sentMessage).toBe('string');
     expect(sentMessage).toMatch(/^I picker /);
     const resultString = sentMessage.substring('I picker '.length);
     const results = resultString.split(', ');
@@ -45,12 +54,13 @@ describe('picker', () => {
     expect(results).toContain('C');
   });
 
-  it('does nothing if the channel cannot send messages', async () => {
-    mockMessage = {
-      channel: {}
-    };
-    const flagsAndArgs = new FlagsAndArgs(new Map(), ['A', 'B', 'C']);
-    await picker(flagsAndArgs, mockMessage as unknown as Message);
-    expect(mockSend).not.toHaveBeenCalled();
+  it('handles empty options', async () => {
+    getStringSpy.and.returnValue('     ');
+    getBooleanSpy.and.returnValue(false);
+
+    await picker.execute(mockInteraction as unknown as ChatInputCommandInteraction, null as any);
+
+    expect(mockReply).toHaveBeenCalledTimes(1);
+    expect(mockReply.calls.mostRecent().args[0].content).toBe('No options provided!');
   });
 });

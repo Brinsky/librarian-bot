@@ -1,5 +1,5 @@
-import {Message} from 'discord.js'
-import {FlagsAndArgs} from './command'
+import { SlashCommandBuilder, ChatInputCommandInteraction } from 'discord.js';
+import { SlashCommand } from './command';
 
 const EMOJI_MAP: ReadonlyMap<string, string> = new Map([
   ['a', '\ud83c\udde6'],
@@ -60,31 +60,46 @@ function emojifyText(text: string): string {
   return emojified.join('\u200b');
 }
 
-export async function emojify(
-  flagsAndArgs: FlagsAndArgs, message: Message): Promise<void> {
-  const args = flagsAndArgs.args;
-  if (!('send' in message.channel)) {
-    return;
+export const emojify: SlashCommand = {
+  data: new SlashCommandBuilder()
+    .setName('emojify')
+    .setDescription('Replaces characters with emojis')
+    .addStringOption(option => 
+      option.setName('text')
+        .setDescription('Text to emojify')
+        .setRequired(true)
+    ),
+  async execute(interaction: ChatInputCommandInteraction) {
+    const text = interaction.options.getString('text', true);
+    const args = text.split(/\s+/);
+    const emojifiedArgs = args.map(arg => emojifyText(arg));
+    await interaction.reply(emojifiedArgs.join('\n'));
   }
-  for (let i = 0; i < args.length; i++) {
-    message.channel.send(emojifyText(args[i]));
-  }
-}
+};
 
 /**
  * Converts strings to UTF-16 "escaped" encoding, e.g. '\uABCD\u1234'.
  */
-export async function utf(flagsAndArgs: FlagsAndArgs, message: Message): Promise<void> {
-  // Iterate over each argument (whitespace separated text/emojis)
-  const allEncoded: string[] = [];
-  for (const arg of flagsAndArgs.args) {
-    // Capture each UTF-16 code point in the string
-    const encoded: string[] = [];
-    for (let i = 0; i < arg.length; i++) {
-      encoded.push('\\u' + arg.charCodeAt(i).toString(16).toUpperCase());
+export const utf: SlashCommand = {
+  data: new SlashCommandBuilder()
+    .setName('utf')
+    .setDescription('Prints the UTF-16 hex encoding of a string')
+    .addStringOption(option => 
+      option.setName('text')
+        .setDescription('Text to encode')
+        .setRequired(true)
+    ),
+  async execute(interaction: ChatInputCommandInteraction) {
+    const text = interaction.options.getString('text', true);
+    const args = text.split(/\s+/);
+    const allEncoded: string[] = [];
+    for (const arg of args) {
+      const encoded: string[] = [];
+      for (let i = 0; i < arg.length; i++) {
+        encoded.push('\\u' + arg.charCodeAt(i).toString(16).toUpperCase());
+      }
+      allEncoded.push(encoded.join(''));
     }
-    allEncoded.push(encoded.join(''));
+    await interaction.reply(allEncoded.join(' '));
   }
-
-  message.reply(allEncoded.join(' '));
-}
+};

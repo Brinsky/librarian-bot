@@ -7,11 +7,13 @@ import {
   Message,
   Snowflake,
   TextChannel,
+  SlashCommandBuilder,
+  ChatInputCommandInteraction,
 } from 'discord.js'
 import BidiMultiMap from './bidimultimap'
 import * as chrono from 'chrono-node';
-import {FlagsAndArgs} from './command'
-import {log, ClientError} from './error'
+import { SlashCommand } from './command'
+import { log, ClientError } from './error'
 import {
   escapeMarkdownChars,
   formatDate,
@@ -36,7 +38,7 @@ interface Event {
 
 const CUSTOM_EMOJI_PATTERN = /<:\w+:(\d+)>/;
 
-function parseDate(s: string|null|undefined): Date|null {
+function parseDate(s: string | null | undefined): Date | null {
   if (s == null) {
     return null;
   }
@@ -52,78 +54,86 @@ export class Aggregators {
   // Channel ID -> Aggregator
   readonly aggregators = new Map<Snowflake, Aggregator>();
 
-  public async aggregate(
-    flagsAndArgs: FlagsAndArgs,
-    message: Message,
-    client: Client): Promise<void> {
-    // Get the channel
-    let channel;
-    if (flagsAndArgs.flags.has('-c')) {
-      const channelId = flagsAndArgs.flags.get('-c')!;
-      try {
-        channel = await client.channels.fetch(channelId);
-      } catch (err: unknown) {
-        throw new ClientError(`Unknown channel ${channelId}`, err as string);
+  public readonly aggregateCommand: SlashCommand = {
+    data: new SlashCommandBuilder()
+      .setName('aggregate')
+      .setDescription('Search for all messages with a given react')
+      .addStringOption(option => option.setName('emoji').setDescription('Emoji to search for').setRequired(true))
+      .addChannelOption(option => option.setName('channel').setDescription('Channel ID to use instead of the current one').setRequired(false))
+      .addStringOption(option => option.setName('start_date').setDescription('Start date to bound the aggregation').setRequired(false))
+      .addStringOption(option => option.setName('end_date').setDescription('End date to bound the aggregation').setRequired(false))
+      .addBooleanOption(option => option.setName('force_rebuild').setDescription('Force rebuilding of the cache for the channel').setRequired(false)),
+    execute: async (interaction: ChatInputCommandInteraction, client: Client) => {
+      let channel: SupportedChannel;
+      const channelOption = interaction.options.getChannel('channel');
+      if (channelOption) {
+        const fetchedChannel = await client.channels.fetch(channelOption.id);
+        if (fetchedChannel instanceof TextChannel || fetchedChannel instanceof DMChannel) {
+          channel = fetchedChannel;
+        } else {
+          throw new ClientError(`Unsupported channel type`);
+        }
+      } else {
+        if (interaction.channel instanceof TextChannel || interaction.channel instanceof DMChannel) {
+          channel = interaction.channel;
+        } else {
+          throw new ClientError(`Unsupported channel type`);
+        }
       }
-    } else {
-      channel = message.channel;
+
+      // Check if cache rebuild is requested
+      const start = parseDate(interaction.options.getString('start_date'));
+      const end = parseDate(interaction.options.getString('end_date'));
+      let buildCache = interaction.options.getBoolean('force_rebuild') ?? false;
+
+      // Parse emoji
+      const rawEmoji = interaction.options.getString('emoji', true);
+      let emoji: string;
+      const matches = rawEmoji.match(CUSTOM_EMOJI_PATTERN);
+      if (matches) { // Custom emoji
+        emoji = matches[0];
+      } else { // Unicode emoji (or invalid)
+        emoji = rawEmoji;
+      }
+
+      // Get or create the aggregator for the channel
+      let aggregator = this.aggregators.get(channel.id);
+      if (aggregator === undefined) {
+        aggregator = new Aggregator(channel);
+        this.aggregators.set(channel.id, aggregator);
+        buildCache = true;
+      }
+
+      await interaction.deferReply();
+
+      // (Re)build the cache if necessary
+      if (buildCache) {
+        // Ensure caching has been marked as started before yielding the thread,
+        // otherwise events might slip in
+        const cachePromise = aggregator.buildCache();
+        await cachePromise;
+      }
+
+      await this.sendResults(
+        interaction, rawEmoji, await aggregator.getMessages(emoji, start, end));
     }
-    if (!(channel instanceof TextChannel || channel instanceof DMChannel)) {
-      throw new ClientError(`Unsupported channel type ${typeof channel}`);
-    }
-
-    const start = parseDate(flagsAndArgs.flags.get('-s'));
-    const end = parseDate(flagsAndArgs.flags.get('-e'));
-
-    // Check if cache rebuild is requested
-    let buildCache = flagsAndArgs.flags.has('-r');
-
-    // Parse the emoji
-    const rawEmoji = flagsAndArgs.args[0];
-    let emoji: string;
-    const matches = rawEmoji.match(CUSTOM_EMOJI_PATTERN);
-    if (matches) { // Custom emoji
-      emoji = matches[0];
-    } else { // Unicode emoji (or invalid)
-      emoji = rawEmoji;
-    }
-
-    // Get or create the aggregator for the channel
-    let aggregator = this.aggregators.get(channel.id);
-    if (aggregator === undefined) {
-      aggregator = new Aggregator(channel);
-      this.aggregators.set(channel.id, aggregator);
-      buildCache = true;
-    }
-
-    // (Re)build the cache if necessary
-    if (buildCache) {
-      // Ensure caching has been marked as started before yielding the thread,
-      // otherwise events might slip in
-      const cachePromise = aggregator.buildCache()
-      await markPending(message);
-      await cachePromise;
-    }
-
-    await this.sendResults(
-      message, rawEmoji, await aggregator.getMessages(emoji, start, end));
-    await markComplete(message, client);
-  }
+  };
 
   private async sendResults(
-    originalMsg: Message,
+    interaction: ChatInputCommandInteraction,
     rawEmoji: string,
     messages: Message[]): Promise<void> {
-    if (!('send' in originalMsg.channel)) {
+    const channel = interaction.channel;
+    if (!channel || !('send' in channel)) {
       return;
     }
-    originalMsg.channel.send(
+    await interaction.editReply(
       `Found ${messages.length} ${rawEmoji} ` +
-        `${pluralize(messages.length, 'reaction')}: `
+      `${pluralize(messages.length, 'reaction')}: `
     );
 
     for (let i = 0; i < messages.length; i += 5) {
-      await originalMsg.channel.send(
+      await channel.send(
         this.messagesToString(messages.slice(i, i + 5)));
     }
   }
@@ -170,9 +180,9 @@ class Aggregator {
   private readonly eventQueue: Event[] = [];
   private buildingCache = false;
 
-  constructor(private readonly channel: SupportedChannel) {}
+  constructor(private readonly channel: SupportedChannel) { }
 
-  public async getMessages(emoji: string, start: Date|null, end: Date|null): Promise<Message[]> {
+  public async getMessages(emoji: string, start: Date | null, end: Date | null): Promise<Message[]> {
     if (this.buildingCache) {
       throw new ClientError(CACHE_REBUILD_MESSAGE);
     }
@@ -226,7 +236,7 @@ class Aggregator {
     // Fetch and process all messages
     let messages: Collection<Snowflake, Message>;
     let totalMessages = 0;
-    const options: FetchMessagesOptions = {limit: 100};
+    const options: FetchMessagesOptions = { limit: 100 };
     do {
       try {
         messages = await this.channel.messages.fetch(options);
