@@ -59,26 +59,39 @@ export class Aggregators {
       .setName('aggregate')
       .setDescription('Search for all messages with a given react')
       .addStringOption(option => option.setName('emoji').setDescription('Emoji to search for').setRequired(true))
-      .addChannelOption(option => option.setName('channel').setDescription('Channel ID to use instead of the current one').setRequired(false))
+      .addStringOption(option => option.setName('channel_id').setDescription('ID of a channel (in any server the bot is in) to use instead of the current one').setRequired(false))
       .addStringOption(option => option.setName('start_date').setDescription('Start date to bound the aggregation').setRequired(false))
       .addStringOption(option => option.setName('end_date').setDescription('End date to bound the aggregation').setRequired(false))
       .addBooleanOption(option => option.setName('force_rebuild').setDescription('Force rebuilding of the cache for the channel').setRequired(false)),
     execute: async (interaction: ChatInputCommandInteraction, client: Client) => {
+      // Results are posted directly to the channel the command was invoked
+      // from, rather than via the interaction's reply, since aggregation
+      // (especially a cache rebuild) can take longer than the 15 minute
+      // window Discord allows for responding to an interaction.
+      if (!(interaction.channel instanceof TextChannel || interaction.channel instanceof DMChannel)) {
+        throw new ClientError('Unsupported channel type');
+      }
+      const replyChannel: SupportedChannel = interaction.channel;
+
       let channel: SupportedChannel;
-      const channelOption = interaction.options.getChannel('channel');
-      if (channelOption) {
-        const fetchedChannel = await client.channels.fetch(channelOption.id);
-        if (fetchedChannel instanceof TextChannel || fetchedChannel instanceof DMChannel) {
-          channel = fetchedChannel;
-        } else {
+      const channelId = interaction.options.getString('channel_id');
+      if (channelId) {
+        let fetchedChannel;
+        try {
+          fetchedChannel = await client.channels.fetch(channelId);
+        } catch {
+          throw new ClientError(`Bot is not in a channel with ID ${channelId}`);
+        }
+        if (!(fetchedChannel instanceof TextChannel || fetchedChannel instanceof DMChannel)) {
           throw new ClientError(`Unsupported channel type`);
         }
+        if (fetchedChannel instanceof TextChannel &&
+          !fetchedChannel.permissionsFor(interaction.user)?.has('ViewChannel')) {
+          throw new ClientError(`You don't have access to channel ID ${channelId}`);
+        }
+        channel = fetchedChannel;
       } else {
-        if (interaction.channel instanceof TextChannel || interaction.channel instanceof DMChannel) {
-          channel = interaction.channel;
-        } else {
-          throw new ClientError(`Unsupported channel type`);
-        }
+        channel = replyChannel;
       }
 
       // Check if cache rebuild is requested
@@ -104,30 +117,44 @@ export class Aggregators {
         buildCache = true;
       }
 
-      await interaction.deferReply();
+      // Resolve the interaction immediately so its token doesn't expire
+      // while the (potentially long-running) aggregation is in progress.
+      await interaction.reply(
+        `Aggregating ${rawEmoji} reactions` +
+        (buildCache ? ' and rebuilding the cache - this may take a while' : '') +
+        `. Results will be posted below when ready.`
+      );
 
-      // (Re)build the cache if necessary
-      if (buildCache) {
-        // Ensure caching has been marked as started before yielding the thread,
-        // otherwise events might slip in
-        const cachePromise = aggregator.buildCache();
-        await cachePromise;
+      try {
+        // (Re)build the cache if necessary
+        if (buildCache) {
+          await aggregator.buildCache();
+        }
+
+        await this.sendResults(
+          replyChannel, rawEmoji,
+          await aggregator.getMessages(emoji, start, end));
+      } catch (err: unknown) {
+        if (err instanceof ClientError) {
+          await replyChannel.send(`${rawEmoji}: ${err.message}`).catch(log);
+          if (err.internalMessage != null) {
+            log(err.internalMessage);
+          }
+        } else {
+          await replyChannel.send(
+            `${rawEmoji}: Failed to complete aggregation due to an internal error`
+          ).catch(log);
+          log(err as string);
+        }
       }
-
-      await this.sendResults(
-        interaction, rawEmoji, await aggregator.getMessages(emoji, start, end));
     }
   };
 
   private async sendResults(
-    interaction: ChatInputCommandInteraction,
+    channel: SupportedChannel,
     rawEmoji: string,
     messages: Message[]): Promise<void> {
-    const channel = interaction.channel;
-    if (!channel || !('send' in channel)) {
-      return;
-    }
-    await interaction.editReply(
+    await channel.send(
       `Found ${messages.length} ${rawEmoji} ` +
       `${pluralize(messages.length, 'reaction')}: `
     );
