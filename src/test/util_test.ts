@@ -1,5 +1,50 @@
 import 'jasmine';
-import { splitMessage } from '../util';
+import { mentionToId, parseMentions, splitMessage } from '../util';
+
+describe('mentionToId', () => {
+  it('extracts the ID from a valid mention', () => {
+    expect(mentionToId('<@123456>')).toBe('123456');
+  });
+
+  it('extracts the ID from a valid nickname mention', () => {
+    expect(mentionToId('<@!123456>')).toBe('123456');
+  });
+
+  it('throws for a string with no mention', () => {
+    expect(() => mentionToId('not a mention')).toThrow();
+  });
+
+  it('throws instead of silently returning only the first mention when ' +
+    'given multiple mentions in one string', () => {
+    expect(() => mentionToId('<@111> <@222> <@333>')).toThrow();
+  });
+
+  it('throws for a mention with trailing extra characters', () => {
+    expect(() => mentionToId('<@123>x')).toThrow();
+  });
+
+  it('throws for a mention with leading extra characters', () => {
+    expect(() => mentionToId('x<@123>')).toThrow();
+  });
+});
+
+describe('parseMentions', () => {
+  it('parses a single mention', () => {
+    expect(parseMentions('<@123>')).toEqual(['123']);
+  });
+
+  it('splits multiple space-separated mentions into individual IDs', () => {
+    expect(parseMentions('<@111> <@222> <@333>')).toEqual(['111', '222', '333']);
+  });
+
+  it('handles repeated and varied whitespace between mentions', () => {
+    expect(parseMentions('  <@111>   <@222>\t<@333>  ')).toEqual(['111', '222', '333']);
+  });
+
+  it('throws if any token is not a valid mention', () => {
+    expect(() => parseMentions('<@111> not-a-mention')).toThrow();
+  });
+});
 
 describe('splitMessage', () => {
   it('returns original string if length is <= 2000', () => {

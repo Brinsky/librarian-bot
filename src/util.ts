@@ -75,20 +75,28 @@ export async function fetchUsers(
   return users;
 }
 
-const MENTION_PATTERN = /<@!?(\d+)>/;
+const MENTION_PATTERN = /^<@!?(\d+)>$/;
 
 /**
  * Converts a user mention (e.g. <@123456>) to a user ID (e.g. 123456). Throws
- * an appropriate ClientError if the given string is not formatted like a
+ * an appropriate ClientError if the given string doesn't contain exactly one
  * mention.
  */
 export function mentionToId(mention: string): string {
   const match = mention.match(MENTION_PATTERN);
-  if (match === null || match.length !== 2) {
+  if (match === null) {
     throw new ClientError(
       `Unrecognized argument ${mention}. Expected an @ tag`);
   }
   return match[1];
+}
+
+/**
+ * Splits a whitespace-separated list of user mentions (e.g.
+ * "<@123> <@456>") into an array of user IDs.
+ */
+export function parseMentions(text: string): string[] {
+  return text.split(/\s+/).filter(s => s.length > 0).map(mentionToId);
 }
 
 export async function markPending(msg: Message): Promise<void> {

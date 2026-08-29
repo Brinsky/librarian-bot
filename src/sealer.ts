@@ -2,7 +2,7 @@ import Datastore from 'nedb-promises'
 import { Client, Collector, Message, MessageReaction, User, SlashCommandBuilder, ChatInputCommandInteraction } from 'discord.js'
 import { SlashCommand } from './command'
 import { ClientError, indicateSuccess } from './error'
-import { assertNonNull, awaitCollectorEnd, fetchUsers, mentionToId, shuffle, splitMessage } from './util'
+import { assertNonNull, awaitCollectorEnd, fetchUsers, parseMentions, shuffle, splitMessage } from './util'
 
 interface Envelope {
   readonly author: string;
@@ -167,8 +167,8 @@ export default class Sealer {
           .setRequired(true)),
     execute: async (interaction: ChatInputCommandInteraction, client: Client) => {
       const mentionsText = interaction.options.getString('mentions', true);
-      const args = mentionsText.split(/\\s+/).filter(s => s.length > 0);
-      const users = await fetchUsers(args.map(mentionToId), client);
+      const args = parseMentions(mentionsText);
+      const users = await fetchUsers(args, client);
       const userIdSet = new Set(users.map((user): string => user.id));
       const envelopes: Map<string, Envelope> = new Map();
 
