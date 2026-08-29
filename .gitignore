@@ -9,3 +9,4 @@ data/music/**/*
 !data/music/fakefile.wav
 .vscode/
 tmp/
+.claude/worktrees/
