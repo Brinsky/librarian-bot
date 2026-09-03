@@ -7,6 +7,7 @@ import { picker } from './picker'
 import { emphasis } from './emphasis'
 import { Aggregators, EventType } from './aggregator'
 import VoiceManager from './voicemanager'
+import CardsAgainst from './cah'
 import * as fs from 'fs'
 
 interface Config {
@@ -39,6 +40,7 @@ const client = new Client({
 const sealer = new Sealer();
 const aggregators = new Aggregators();
 const voiceManager = new VoiceManager();
+const cardsAgainst = new CardsAgainst();
 
 const slashCommands = new Collection<string, SlashCommand>();
 
@@ -55,7 +57,8 @@ const commandsList: SlashCommand[] = [
   voiceManager.vjoinCommand,
   voiceManager.vleaveCommand,
   voiceManager.vplayCommand,
-  voiceManager.boardCommand
+  voiceManager.boardCommand,
+  cardsAgainst.cahCommand
 ];
 
 for (const cmd of commandsList) {

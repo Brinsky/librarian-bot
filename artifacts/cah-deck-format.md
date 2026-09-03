@@ -110,8 +110,8 @@ Distinct numbers mean **distinct white cards**:
 The number of white cards a black card requires is always derived: it's the count of
 *distinct* placeholder numbers in `text`.
 
-Every black card must contain at least one placeholder — a black card with no
-placeholders is invalid.
+Black cards with no placeholders are also allowed - these are generally assumed to be
+question-and-answer-style cards to which the white card would be appended.
 
 ---
 
@@ -126,11 +126,14 @@ Card text supports a deliberately small Markdown subset:
 | `\n` | Line break |
 
 Emphasis uses **asterisks only**. Underscores are always literal, since black card
-blanks are represented by placeholders.
+blanks are represented by placeholders. Each formatting character should be possible
+to escape with a backslash, e.g. `\*`.
 
 Everything else (links, headings, code, tables, blockquotes, lists) is out of scope. A
 renderer encountering unsupported syntax should display it literally rather than
-erroring.
+erroring. Since an implementation may use general-purpose Markdown parser / rendering
+tools, it may be better to assume these features are supported (as well as proactively
+using escape characters like `\_` for intentional underscores when creating decks.)
 
 Example using both:
 
@@ -150,21 +153,22 @@ A conforming deck satisfies all of:
 1. `deckName`, `parentSet`, and `cards` are present.
 2. All `id` values are unique within their card type (black or white) in the deck.
 3. Every card has non-empty `text`.
-4. Every black card contains at least one placeholder, and placeholder numbers are
-   contiguous starting from 1.
+4. Placeholder numbers on a black card are contiguous starting from 1.
 
 ---
 
-## 7. Complete minimal example
+## 6. Complete minimal example
 
 ```json
 {
   "deckName": "Mini Example",
+  "parentSet": "Cards Against Humanity",
   "cards": {
     "black": [
       { "id": 0, "text": "No {1} November" },
       { "id": 1, "text": "I think it's pretty intuitive why {1} is ok but {2} is not." },
-      { "id": 2, "text": "What's the worst thing to find in your {1}?" }
+      { "id": 2, "text": "What's the worst thing to find in your {1}?" },
+      { "id": 3, "text": "What’s a good way to kill some time between the cradle and the grave?" }
     ],
     "white": [
       { "id": 0, "text": "Food UX" },
