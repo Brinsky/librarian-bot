@@ -4,7 +4,9 @@ import {
   DMChannel,
   Emoji,
   FetchMessagesOptions,
+  GuildMember,
   Message,
+  PermissionFlagsBits,
   Snowflake,
   TextChannel,
   SlashCommandBuilder,
@@ -75,6 +77,7 @@ export class Aggregators {
 
       let channel: SupportedChannel;
       const channelId = interaction.options.getString('channel_id');
+      // TODO: Move cross-channel permission checks into a central helper
       if (channelId) {
         let fetchedChannel;
         try {
@@ -85,9 +88,27 @@ export class Aggregators {
         if (!(fetchedChannel instanceof TextChannel || fetchedChannel instanceof DMChannel)) {
           throw new ClientError(`Unsupported channel type`);
         }
-        if (fetchedChannel instanceof TextChannel &&
-          !fetchedChannel.permissionsFor(interaction.user)?.has('ViewChannel')) {
-          throw new ClientError(`You don't have access to channel ID ${channelId}`);
+        const noAccess = new ClientError(
+          `You don't have access to channel ID ${channelId}`);
+        if (fetchedChannel instanceof TextChannel) {
+          // Fetch guild membership for channel since it may not be cached
+          let member: GuildMember;
+          try {
+            member = await fetchedChannel.guild.members.fetch(interaction.user.id);
+          } catch (err: unknown) {
+            // Most likely 'Unknown Member' - i.e. the user isn't in the guild
+            // at all, which is a legitimate denial.
+            throw new ClientError(noAccess.message,
+              `Failed to fetch member ${interaction.user.id} in guild ` +
+              `${fetchedChannel.guild.id}: ${err instanceof Error ? err.message : String(err)}`);
+          }
+          if (!fetchedChannel.permissionsFor(member)?.has(PermissionFlagsBits.ViewChannel)) {
+            throw noAccess;
+          }
+        // DM channels have no permission overwrites to consult; the only user
+        // entitled to one is the recipient on the other end of it
+        } else if (fetchedChannel.recipientId !== interaction.user.id) {
+          throw noAccess;
         }
         channel = fetchedChannel;
       } else {
