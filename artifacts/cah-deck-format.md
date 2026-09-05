@@ -1,7 +1,8 @@
 # CAH Deck Format — Specification
 
 A JSON format for representing Cards Against Humanity–style decks in a form a game
-engine can consume directly.
+engine can consume directly, plus the conventions an engine uses to select decks for
+a draw and to configure default gameplay behavior.
 
 Design goals:
 
@@ -158,7 +159,60 @@ A conforming deck satisfies all of:
 
 ---
 
-## 6. Complete minimal example
+## 6. Deck filtering
+
+Decks loaded by an engine are identified for filtering purposes by a **qualified
+name**: `<parentSet>[ <deckNumber>]: <deckName>` — the deck number is included only
+when the deck defines one. This is the same string an engine should show as the
+source of a drawn card.
+
+A **pattern** matches a deck if it is a case-insensitive substring of that deck's
+qualified name. A single pattern can therefore match several decks at once.
+
+Two independent filters can be applied to a draw, each a comma-separated list of
+patterns (a card qualifies if it matches *any* one of them — the patterns are
+unioned, not intersected):
+
+- **`allFrom`** — every card in the draw (the black card and all white cards) must
+  come from a deck matched by one of the patterns.
+- **`oneFrom`** — the draw as a whole must include at least one card, black or
+  white, from a deck matched by one of the patterns. The remaining cards may come
+  from anywhere `allFrom` allows.
+
+An empty filter (no patterns, or omitted entirely) applies no restriction.
+
+As one possible simple implementation, an engine could satisfy `oneFrom` by drawing a
+normal hand and checking the condition afterward, retrying up to a bounded number of
+attempts, and failing the draw if none of the attempts qualify. An unsatisfiable
+combination — e.g. `oneFrom` naming a deck that `allFrom` already excludes — could simply exhaust the retry budget and fail accordingly.
+
+---
+
+## 7. Runtime configuration (config.json)
+
+A `config.json` file alongside the deck files sets default values for the filters
+described in §6, so a draw request doesn't have to specify them every time:
+
+```json
+{
+  "allFrom": "",
+  "oneFrom": ""
+}
+```
+
+| Field | Required | Description |
+|---|---|---|
+| `allFrom` | no | Default `allFrom` pattern list, used when a draw request doesn't specify one explicitly. Defaults to `""` (no restriction). |
+| `oneFrom` | no | Default `oneFrom` pattern list, used when a draw request doesn't specify one explicitly. Defaults to `""` (no restriction). |
+
+**Loading.** An engine scanning a directory for deck files should skip `config.json`
+rather than attempting to parse it as a deck. By convention, template/example files
+meant to be copied rather than loaded — such as `config-sample.json` and
+`sample-deck.json` — are also skipped.
+
+---
+
+## 8. Complete minimal example
 
 ```json
 {

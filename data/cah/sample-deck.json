@@ -1,0 +1,17 @@
+{
+  "deckName": "Mini Example",
+  "deckNumber": 2,
+  "parentSet": "Cards Against Humanity",
+  "cards": {
+    "black": [
+      { "id": 0, "text": "No {1} November" },
+      { "id": 1, "text": "I think it's pretty intuitive why {1} is ok but {2} is not." },
+      { "id": 2, "text": "What's the worst thing to find in your {1}?" },
+      { "id": 3, "text": "What’s a good way to kill some time between the cradle and the grave?" }
+    ],
+    "white": [
+      { "id": 0, "text": "Food UX" },
+      { "id": 1, "text": "Personal attacks" }
+    ]
+  }
+}

@@ -13,6 +13,30 @@ const BLANK = '__' + ' '.repeat(BLANK_LENGTH) + '__';
 const MAX_DRAW_ATTEMPTS_PER_CARD = 5;
 const MAX_DRAW_ATTEMPTS_PER_HAND = 15;
 
+const CONFIG_FILENAME = 'config.json';
+// Files in DECK_DIR that aren't decks and shouldn't be loaded as one.
+const IGNORED_DECK_FILES = new Set([
+  CONFIG_FILENAME,
+  'config-sample.json',
+  'sample-deck.json',
+]);
+
+interface CahConfig {
+  allFrom: string;
+  oneFrom: string;
+}
+
+const DEFAULT_CONFIG: CahConfig = { allFrom: '', oneFrom: '' };
+
+function loadConfig(): CahConfig {
+  try {
+    const raw = fs.readFileSync(`${DECK_DIR}/${CONFIG_FILENAME}`).toString();
+    return { ...DEFAULT_CONFIG, ...JSON.parse(raw) };
+  } catch {
+    return DEFAULT_CONFIG;
+  }
+}
+
 // Only used for parsing from JSON
 interface RawCard {
   id: number;
@@ -141,14 +165,17 @@ const ONE_FROM_DESCRIPTION =
 
 /** Loads CAH decks and provides the /cah command for drawing a random hand. */
 export default class CardsAgainst {
+  private readonly config: CahConfig;
   private readonly decks: Set<Deck> = new Set<Deck>();
   private readonly blackCards: Card[] = [];
   private readonly whiteCards: Card[] = [];
 
   public constructor() {
+    this.config = loadConfig();
+
     // Load all decks during startup
     for (const file of fs.readdirSync(DECK_DIR)) {
-      if (!file.endsWith('.json')) {
+      if (!file.endsWith('.json') || IGNORED_DECK_FILES.has(file)) {
         continue;
       }
       const deck =
@@ -178,8 +205,12 @@ export default class CardsAgainst {
           .setDescription(ONE_FROM_DESCRIPTION)
           .setRequired(false)),
     execute: async (interaction: ChatInputCommandInteraction) => {
-      const allFromInput = interaction.options.getString('all_from');
-      const oneFromInput = interaction.options.getString('one_from');
+      // An explicitly passed (possibly empty) option overrides the
+      // configured default; an omitted option falls back to it.
+      const allFromInput =
+        interaction.options.getString('all_from') ?? this.config.allFrom;
+      const oneFromInput =
+        interaction.options.getString('one_from') ?? this.config.oneFrom;
 
       const allFromDecks = allFromInput ?
         resolveDecks(allFromInput, this.decks) : this.decks;
@@ -197,7 +228,10 @@ export default class CardsAgainst {
       let hand: Hand | undefined;
       if (oneFromInput) {
         const oneFromDecks = resolveDecks(oneFromInput, this.decks);
-        for (let attempt = 0; attempt < MAX_DRAW_ATTEMPTS_PER_HAND && !hand; attempt++) {
+        for (
+          let attempt = 0;
+          attempt < MAX_DRAW_ATTEMPTS_PER_HAND && !hand;
+          attempt++) {
           let candidate: Hand;
           try {
             candidate = drawHand(blackPool, whitePool);
