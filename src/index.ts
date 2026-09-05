@@ -172,7 +172,7 @@ function init(): void {
   try {
     config =
       JSON.parse(fs.readFileSync('data/config.json').toString()) as Config
-  } catch (err: unknown) {
+  } catch {
     log('Failed to read configuration file; shutting down');
     return;
   }

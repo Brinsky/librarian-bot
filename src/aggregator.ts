@@ -302,7 +302,7 @@ class Aggregator {
     do {
       try {
         messages = await this.channel.messages.fetch(options);
-      } catch (err: unknown) {
+      } catch {
         // log error, clear cache, etc.
         this.buildingCache = false;
         return;

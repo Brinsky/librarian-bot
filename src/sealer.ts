@@ -73,8 +73,6 @@ export default class Sealer {
       filename: 'data/sealedenvelopes',
       autoload: true,
     });
-
-    this.database.insert
   }
   public readonly sealCommand: SlashCommand = {
     data: new SlashCommandBuilder()
