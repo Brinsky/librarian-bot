@@ -6,5 +6,6 @@ import {
 
 export interface SlashCommand {
   data: SlashCommandBuilder | ReturnType<SlashCommandBuilder['toJSON']> | any;
-  execute(interaction: ChatInputCommandInteraction, client: Client): Promise<void>;
+  execute(
+    interaction: ChatInputCommandInteraction, client: Client): Promise<void>;
 }

@@ -1,8 +1,21 @@
 import Datastore from 'nedb-promises'
-import { Client, Collector, Message, MessageReaction, User, SlashCommandBuilder, ChatInputCommandInteraction } from 'discord.js'
+import {
+  Client,
+  Message,
+  MessageReaction,
+  User,
+  SlashCommandBuilder,
+  ChatInputCommandInteraction,
+} from 'discord.js'
 import { SlashCommand } from './command'
-import { ClientError, indicateSuccess } from './error'
-import { assertNonNull, awaitCollectorEnd, fetchUsers, parseMentions, shuffle, splitMessage } from './util'
+import { ClientError } from './error'
+import {
+  awaitCollectorEnd,
+  fetchUsers,
+  parseMentions,
+  shuffle,
+  splitMessage,
+} from './util'
 
 interface Envelope {
   readonly author: string;
@@ -67,8 +80,10 @@ export default class Sealer {
     data: new SlashCommandBuilder()
       .setName('seal')
       .setDescription('Seal a secret envelope to be unsealed at a later time')
-      .addStringOption(option => option.setName('title').setDescription('Title of the envelope').setRequired(true))
-      .addStringOption(option => option.setName('content').setDescription('Content of the envelope').setRequired(true)),
+      .addStringOption(option => option.setName('title')
+        .setDescription('Title of the envelope').setRequired(true))
+      .addStringOption(option => option.setName('content')
+        .setDescription('Content of the envelope').setRequired(true)),
     execute: async (interaction: ChatInputCommandInteraction) => {
       const title = interaction.options.getString('title', true);
       const content = interaction.options.getString('content', true);
@@ -97,7 +112,8 @@ export default class Sealer {
         });
         await interaction.reply({ content: 'Envelope sealed!' });
       } catch (err) {
-        throw new ClientError('Unable to write envelope to database', err as string);
+        throw new ClientError(
+          'Unable to write envelope to database', err as string);
       }
     }
   };
@@ -106,7 +122,8 @@ export default class Sealer {
     data: new SlashCommandBuilder()
       .setName('unseal')
       .setDescription('Unseal a previously sealed envelopes')
-      .addStringOption(option => option.setName('title').setDescription('Title of the envelope').setRequired(true)),
+      .addStringOption(option => option.setName('title')
+        .setDescription('Title of the envelope').setRequired(true)),
     execute: async (interaction: ChatInputCommandInteraction) => {
       const title = interaction.options.getString('title', true);
 
@@ -118,7 +135,9 @@ export default class Sealer {
       }
 
       if (envelope) {
-        const chunks = splitMessage(`Unsealing "${envelope.title}" from ${envelope.time}:\n${envelope.content}`);
+        const chunks = splitMessage(
+          `Unsealing "${envelope.title}" from ${envelope.time}:\n` +
+          `${envelope.content}`);
         await interaction.reply({ content: chunks[0] });
         for (let i = 1; i < chunks.length; i++) {
           await interaction.followUp({ content: chunks[i] });
@@ -144,12 +163,16 @@ export default class Sealer {
       }
 
       if (envelopes.length === 0) {
-        await interaction.reply({ content: 'You haven\'t sealed any envelopes yet!' });
+        await interaction.reply(
+          { content: 'You haven\'t sealed any envelopes yet!' });
         return;
       }
 
-      const listText = envelopes.map(e => `- **${e.title}** (sealed on ${e.time})`).join('\n');
-      const chunks = splitMessage(`**Your Sealed Envelopes:**\n${listText}`);
+      const listText = envelopes
+        .map(e => `- **${e.title}** (sealed on ${e.time})`)
+        .join('\n');
+      const chunks = splitMessage(
+        `**Your Sealed Envelopes:**\n${listText}`);
       await interaction.reply({ content: chunks[0] });
       for (let i = 1; i < chunks.length; i++) {
         await interaction.followUp({ content: chunks[i] });
@@ -163,9 +186,11 @@ export default class Sealer {
       .setDescription('Start a vote to unseal envelopes')
       .addStringOption(option =>
         option.setName('mentions')
-          .setDescription('Mentions of users to include in the vote (space separated)')
+          .setDescription(
+            'Mentions of users to include in the vote (space separated)')
           .setRequired(true)),
-    execute: async (interaction: ChatInputCommandInteraction, client: Client) => {
+    execute: async (
+      interaction: ChatInputCommandInteraction, client: Client) => {
       const mentionsText = interaction.options.getString('mentions', true);
       const args = parseMentions(mentionsText);
       const users = await fetchUsers(args, client);
@@ -174,7 +199,8 @@ export default class Sealer {
 
       const channel = interaction.channel;
       if (!channel || !('send' in channel)) {
-        throw new ClientError('Command must be used in a channel that supports sending messages');
+        throw new ClientError(
+          'Command must be used in a channel that supports sending messages');
       }
 
       const voteMessageText = buildVoteMessage(users, envelopes);
@@ -184,13 +210,18 @@ export default class Sealer {
       });
       await voteMessage.react(APPROVE_REACT);
 
-      const voteCollector = voteMessage.createReactionCollector(
-        { filter: createFilter(APPROVE_REACT, userIdSet), max: users.length, time: HOUR_MS, dispose: true });
+      const voteCollector = voteMessage.createReactionCollector({
+        filter: createFilter(APPROVE_REACT, userIdSet),
+        max: users.length,
+        time: HOUR_MS,
+        dispose: true,
+      });
 
       let pendingEditsPromise: Promise<void> = Promise.resolve();
 
-      voteCollector.on('collect', (reaction: MessageReaction, user: User): void => {
-        pendingEditsPromise =
+      voteCollector.on(
+        'collect', (reaction: MessageReaction, user: User): void => {
+          pendingEditsPromise =
           pendingEditsPromise
             .then((): Promise<Envelope> => this.getLatestEnvelope(user.id))
             .then((envelope): Promise<Message> => {
@@ -198,17 +229,18 @@ export default class Sealer {
               return voteMessage.edit(buildVoteMessage(users, envelopes));
             })
             .then();
-      });
+        });
 
-      voteCollector.on('remove', (reaction: MessageReaction, user: User): void => {
-        pendingEditsPromise =
+      voteCollector.on(
+        'remove', (reaction: MessageReaction, user: User): void => {
+          pendingEditsPromise =
           pendingEditsPromise
             .then((): Promise<Message> => {
               envelopes.delete(user.id);
               return voteMessage.edit(buildVoteMessage(users, envelopes));
             })
             .then();
-      });
+        });
 
       await awaitCollectorEnd(voteCollector);
       await pendingEditsPromise;
@@ -229,14 +261,17 @@ export default class Sealer {
         + `I will also react with ${CANCEL_REACT} for convenience.`);
       await countdownMessage.react(CANCEL_REACT);
 
-      const countdownCollector =
-        countdownMessage.createReactionCollector(
-          { filter: createFilter(CANCEL_REACT, userIdSet), max: 1, time: THIRTY_SEC_MS });
+      const countdownCollector = countdownMessage.createReactionCollector({
+        filter: createFilter(CANCEL_REACT, userIdSet),
+        max: 1,
+        time: THIRTY_SEC_MS,
+      });
 
       let cancelledBy: User | null = null;
-      countdownCollector.on('collect', (reaction: MessageReaction, user: User): void => {
-        cancelledBy = user;
-      });
+      countdownCollector.on(
+        'collect', (reaction: MessageReaction, user: User): void => {
+          cancelledBy = user;
+        });
 
       await awaitCollectorEnd(countdownCollector);
       if (countdownCollector.collected.size > 0) {

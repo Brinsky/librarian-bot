@@ -34,11 +34,13 @@ describe('parseMentions', () => {
   });
 
   it('splits multiple space-separated mentions into individual IDs', () => {
-    expect(parseMentions('<@111> <@222> <@333>')).toEqual(['111', '222', '333']);
+    expect(parseMentions('<@111> <@222> <@333>'))
+      .toEqual(['111', '222', '333']);
   });
 
   it('handles repeated and varied whitespace between mentions', () => {
-    expect(parseMentions('  <@111>   <@222>\t<@333>  ')).toEqual(['111', '222', '333']);
+    expect(parseMentions('  <@111>   <@222>\t<@333>  '))
+      .toEqual(['111', '222', '333']);
   });
 
   it('throws if any token is not a valid mention', () => {

@@ -4,7 +4,7 @@
   "description": "A simple Discord bot for book club",
   "main": "index.js",
   "scripts": {
-    "lint": "node_modules/eslint/bin/eslint.js",
+    "lint": "node_modules/eslint/bin/eslint.js 'src/**/*.ts'",
     "test": "node_modules/jasmine/bin/jasmine.js --config=jasmine.json"
   },
   "repository": {

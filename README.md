@@ -22,3 +22,13 @@ A simple Discord bot for book club.
 8. `npx tsc` (compile the TypeScript source code)
 9. Start the server: `node build/index.js`
     - You may prefer to run this in a detached session using e.g. [`screen`](https://www.gnu.org/software/screen/) or [`tmux`](https://github.com/tmux/tmux/wiki)
+
+## Running tests
+
+Run `npm run tests` to run the [Jasmine](https://jasmine.github.io/) unit tests.
+
+## Linting
+
+Run `npm run lint` to check the source under `src/` against the project's ESLint rules.
+
+Some errors (e.g. indentation, stray semicolons) can be fixed automatically; run `npm run lint -- --fix` to apply those and see what's left to fix by hand.

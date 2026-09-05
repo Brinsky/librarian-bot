@@ -1,5 +1,5 @@
 import { Client, Collection, GatewayIntentBits, Partials } from 'discord.js'
-import { ClientError, logClientError, log } from './error'
+import { ClientError, log } from './error'
 import { SlashCommand } from './command'
 import { emojify, utf } from './emojifier'
 import Sealer from './sealer'
@@ -67,7 +67,7 @@ for (const cmd of commandsList) {
 
 /////////// Event-handling code ///////////
 
-client.on('messageReactionAdd', async (reaction, user) => {
+client.on('messageReactionAdd', async (reaction) => {
   aggregators.handleEvent(reaction.message.channel.id, {
     msgId: reaction.message.id,
     eventType: EventType.ADD_EMOJI,
@@ -75,7 +75,7 @@ client.on('messageReactionAdd', async (reaction, user) => {
   });
 });
 
-client.on('messageReactionRemove', async (reaction, user) => {
+client.on('messageReactionRemove', async (reaction) => {
   // We re-fetch the message so that we have the latest set of reactions
   // (which excludes the one being removed here)
   const message = reaction.message.partial
@@ -83,7 +83,8 @@ client.on('messageReactionRemove', async (reaction, user) => {
 
   const matchingReaction = message.reactions.cache.find(
     (r) => r.emoji.toString() === reaction.emoji.toString());
-  if (matchingReaction === undefined || matchingReaction.users.cache.size == 0) {
+  if (matchingReaction === undefined
+      || matchingReaction.users.cache.size == 0) {
     aggregators.handleEvent(message.channel.id, {
       msgId: message.id,
       eventType: EventType.REMOVE_EMOJI,
@@ -96,7 +97,8 @@ client.on('messageDelete', async (message) => {
   // Fetching the message would result in an 'unknown message' API error
 
   const channel = message.channel;
-  log(`messageDelete event: Message ID = ${message.id}, Channel ID = ${channel?.id}`);
+  log(`messageDelete event: Message ID = ${message.id}, Channel ID = ` +
+    `${channel?.id}`);
 
   if (channel != null) {
     aggregators.handleEvent(channel.id, {
@@ -111,7 +113,8 @@ client.once('clientReady', async () => {
   log('I am ready!');
   try {
     // Register commands globally or to the test guild
-    const commandsData = commandsList.map(c => c.data.toJSON ? c.data.toJSON() : c.data);
+    const commandsData = commandsList.map(
+      c => c.data.toJSON ? c.data.toJSON() : c.data);
     if (config.testGuildId) {
       log(`Registering slash commands to test guild: ${config.testGuildId}`);
       await client.application?.commands.set(commandsData, config.testGuildId);
@@ -137,10 +140,11 @@ client.on('interactionCreate', async interaction => {
   } catch (err: unknown) {
     if (err instanceof ClientError) {
       if (interaction.replied || interaction.deferred) {
-        // If the command already successfully replied, OR if it called deferReply()
-        // to buy more time, we can no longer use .reply().
+        // If the command already successfully replied, OR if it called
+        // deferReply() to buy more time, we can no longer use .reply().
         // We MUST use .followUp() to send the error message.
-        await interaction.followUp({ content: err.message }).catch(console.error);
+        await interaction.followUp({ content: err.message })
+          .catch(console.error);
       } else {
         // If the command crashed instantly before doing anything,
         // the interaction hasn't been acknowledged yet.
@@ -179,6 +183,6 @@ function init(): void {
   process.on('unhandledRejection', console.error);
 
   client.login(config.token);
-};
+}
 
 init();

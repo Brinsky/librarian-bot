@@ -26,4 +26,4 @@ export class ClientError extends Error {
   public constructor(message: string, readonly internalMessage?: string) {
     super(message);
   }
-};
+}

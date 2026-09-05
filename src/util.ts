@@ -121,7 +121,7 @@ export function escapeMarkdownChars(text: string): string {
   return unescaped.replace(/[\\*_~`]/g, '\\$&');
 }
 
-export function formatDate(date: Date) {
+export function formatDate(date: Date): string {
   return date.toLocaleDateString('en-US', {
     timeZone: 'America/New_York',
     year: 'numeric',
@@ -145,7 +145,8 @@ export async function readJsonFile<T>(filePath: string): Promise<T> {
  * Returns a promise that resolves when the provided collector emits an 'end'
  * event.
  */
-export function awaitCollectorEnd<K, V, F extends unknown[]>(collector: Collector<K, V, F>): Promise<void> {
+export function awaitCollectorEnd<K, V, F extends unknown[]>(
+  collector: Collector<K, V, F>): Promise<void> {
   return new Promise((resolve): void => {
     collector.on('end', (): void => {
       resolve();
@@ -160,8 +161,10 @@ export const CHUNK_ALLOWED_CHARS = 1900;
  * Splits a string into an array of smaller strings under the character limit.
  * Used to send long outputs without hitting the Discord 2000 char threshold.
  *
- * - If the message <= 2000 chars, it is returned unchanged as the sole element.
- * - Otherwise, chunks are carved at the last newline before index 1900 (or at 1900 arbitrarily if no newline).
+ * - If the message <= 2000 chars, it is returned unchanged as the sole
+ *   element.
+ * - Otherwise, chunks are carved at the last newline before index 1900 (or
+ *   at 1900 arbitrarily if no newline).
  * - Pre-pends pagination headers to all split chunks
  */
 export function splitMessage(text: string): string[] {

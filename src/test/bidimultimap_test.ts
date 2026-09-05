@@ -82,8 +82,8 @@ describe('BidiMultiMap', () => {
     });
     it('should fail to delete unknown objects', () => {
       expect(() => map.deleteA('abc'))
-          .toThrow(
-              new Error('Failed to delete untracked \'A\' (abc)'));
+        .toThrow(
+          new Error('Failed to delete untracked \'A\' (abc)'));
     });
   });
 
@@ -113,22 +113,22 @@ describe('BidiMultiMap', () => {
     });
     it('should fail to delete unknown objects', () => {
       expect(() => map.deleteB(123))
-          .toThrow(
-              new Error('Failed to delete untracked \'B\' (123)'));
+        .toThrow(
+          new Error('Failed to delete untracked \'B\' (123)'));
     });
   });
 
   describe('#getA()', () => {
     it('should throw an error for non-existent objects', () => {
       expect(() => map.getA('abc'))
-          .toThrow(new Error('No such \'A\' element (abc)'));
+        .toThrow(new Error('No such \'A\' element (abc)'));
     });
   });
 
   describe('#getB()', () => {
     it('should throw an error for non-existent objects', () => {
       expect(() => map.getB(123))
-          .toThrow(new Error('No such \'B\' element (123)'));
+        .toThrow(new Error('No such \'B\' element (123)'));
     });
   });
 });

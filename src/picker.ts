@@ -36,7 +36,7 @@ export const picker: SlashCommand = {
     const chunks = splitMessage(output);
     await interaction.reply({ content: chunks[0] });
     for (let i = 1; i < chunks.length; i++) {
-        await interaction.followUp({ content: chunks[i] });
+      await interaction.followUp({ content: chunks[i] });
     }
   }
 };

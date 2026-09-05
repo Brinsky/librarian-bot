@@ -2,7 +2,6 @@ import {
   Client,
   Collection,
   DMChannel,
-  Emoji,
   FetchMessagesOptions,
   GuildMember,
   Message,
@@ -16,13 +15,7 @@ import BidiMultiMap from './bidimultimap'
 import * as chrono from 'chrono-node';
 import { SlashCommand } from './command'
 import { log, ClientError } from './error'
-import {
-  escapeMarkdownChars,
-  formatDate,
-  pluralize,
-  markPending,
-  markComplete,
-} from './util'
+import { escapeMarkdownChars, formatDate, pluralize } from './util'
 
 type SupportedChannel = TextChannel | DMChannel;
 
@@ -60,17 +53,30 @@ export class Aggregators {
     data: new SlashCommandBuilder()
       .setName('aggregate')
       .setDescription('Search for all messages with a given react')
-      .addStringOption(option => option.setName('emoji').setDescription('Emoji to search for').setRequired(true))
-      .addStringOption(option => option.setName('channel_id').setDescription('ID of a channel (in any server the bot is in) to use instead of the current one').setRequired(false))
-      .addStringOption(option => option.setName('start_date').setDescription('Start date to bound the aggregation').setRequired(false))
-      .addStringOption(option => option.setName('end_date').setDescription('End date to bound the aggregation').setRequired(false))
-      .addBooleanOption(option => option.setName('force_rebuild').setDescription('Force rebuilding of the cache for the channel').setRequired(false)),
-    execute: async (interaction: ChatInputCommandInteraction, client: Client) => {
+      .addStringOption(option => option.setName('emoji')
+        .setDescription('Emoji to search for').setRequired(true))
+      .addStringOption(option => option.setName('channel_id')
+        .setDescription(
+          'ID of a channel (in any server the bot is in) to use ' +
+          'instead of the current one')
+        .setRequired(false))
+      .addStringOption(option => option.setName('start_date')
+        .setDescription('Start date to bound the aggregation')
+        .setRequired(false))
+      .addStringOption(option => option.setName('end_date')
+        .setDescription('End date to bound the aggregation')
+        .setRequired(false))
+      .addBooleanOption(option => option.setName('force_rebuild')
+        .setDescription('Force rebuilding of the cache for the channel')
+        .setRequired(false)),
+    execute: async (
+      interaction: ChatInputCommandInteraction, client: Client) => {
       // Results are posted directly to the channel the command was invoked
       // from, rather than via the interaction's reply, since aggregation
       // (especially a cache rebuild) can take longer than the 15 minute
       // window Discord allows for responding to an interaction.
-      if (!(interaction.channel instanceof TextChannel || interaction.channel instanceof DMChannel)) {
+      if (!(interaction.channel instanceof TextChannel ||
+        interaction.channel instanceof DMChannel)) {
         throw new ClientError('Unsupported channel type');
       }
       const replyChannel: SupportedChannel = interaction.channel;
@@ -85,7 +91,8 @@ export class Aggregators {
         } catch {
           throw new ClientError(`Bot is not in a channel with ID ${channelId}`);
         }
-        if (!(fetchedChannel instanceof TextChannel || fetchedChannel instanceof DMChannel)) {
+        if (!(fetchedChannel instanceof TextChannel ||
+          fetchedChannel instanceof DMChannel)) {
           throw new ClientError(`Unsupported channel type`);
         }
         const noAccess = new ClientError(
@@ -94,15 +101,18 @@ export class Aggregators {
           // Fetch guild membership for channel since it may not be cached
           let member: GuildMember;
           try {
-            member = await fetchedChannel.guild.members.fetch(interaction.user.id);
+            member = await fetchedChannel.guild.members.fetch(
+              interaction.user.id);
           } catch (err: unknown) {
             // Most likely 'Unknown Member' - i.e. the user isn't in the guild
             // at all, which is a legitimate denial.
+            const errMessage = err instanceof Error ? err.message : String(err);
             throw new ClientError(noAccess.message,
               `Failed to fetch member ${interaction.user.id} in guild ` +
-              `${fetchedChannel.guild.id}: ${err instanceof Error ? err.message : String(err)}`);
+              `${fetchedChannel.guild.id}: ${errMessage}`);
           }
-          if (!fetchedChannel.permissionsFor(member)?.has(PermissionFlagsBits.ViewChannel)) {
+          if (!fetchedChannel.permissionsFor(member)
+              ?.has(PermissionFlagsBits.ViewChannel)) {
             throw noAccess;
           }
         // DM channels have no permission overwrites to consult; the only user
@@ -142,7 +152,8 @@ export class Aggregators {
       // while the (potentially long-running) aggregation is in progress.
       await interaction.reply(
         `Aggregating ${rawEmoji} reactions` +
-        (buildCache ? ' and rebuilding the cache - this may take a while' : '') +
+        (buildCache ?
+          ' and rebuilding the cache - this may take a while' : '') +
         `. Results will be posted below when ready.`
       );
 
@@ -163,7 +174,8 @@ export class Aggregators {
           }
         } else {
           await replyChannel.send(
-            `${rawEmoji}: Failed to complete aggregation due to an internal error`
+            `${rawEmoji}: Failed to complete aggregation due to an ` +
+            'internal error'
           ).catch(log);
           log(err as string);
         }
@@ -203,7 +215,7 @@ export class Aggregators {
       text.push('```\n');
     }
     return text.join('');
-  };
+  }
 
   public hasAggregator(channelId: Snowflake): boolean {
     return this.aggregators.has(channelId);
@@ -230,19 +242,22 @@ class Aggregator {
 
   constructor(private readonly channel: SupportedChannel) { }
 
-  public async getMessages(emoji: string, start: Date | null, end: Date | null): Promise<Message[]> {
+  public async getMessages(
+    emoji: string, start: Date | null, end: Date | null,
+  ): Promise<Message[]> {
     if (this.buildingCache) {
       throw new ClientError(CACHE_REBUILD_MESSAGE);
     }
 
     if (!this.messageIdsToEmojis.containsB(emoji)) {
       return []
-    };
+    }
 
     const messages: Message[] = [];
     for (const msgId of this.messageIdsToEmojis.getB(emoji)) {
       const message = await this.channel.messages.fetch(msgId);
-      if ((start === null || message.createdAt > start) && (end === null || message.createdAt < end)) {
+      if ((start === null || message.createdAt > start)
+          && (end === null || message.createdAt < end)) {
         messages.push(message);
       }
     }
@@ -283,7 +298,6 @@ class Aggregator {
 
     // Fetch and process all messages
     let messages: Collection<Snowflake, Message>;
-    let totalMessages = 0;
     const options: FetchMessagesOptions = { limit: 100 };
     do {
       try {
@@ -293,8 +307,6 @@ class Aggregator {
         this.buildingCache = false;
         return;
       }
-      totalMessages += messages.size;
-
       for (const msg of messages.values()) {
         for (const react of msg.reactions.cache.values()) {
           this.messageIdsToEmojis.link(msg.id, react.emoji.toString());

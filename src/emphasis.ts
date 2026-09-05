@@ -7,7 +7,8 @@ const MAX_OUTPUT_SENTENCES = 30;
 export const emphasis: SlashCommand = {
   data: new SlashCommandBuilder()
     .setName('emphasis')
-    .setDescription('Repeats a sentence, moving the emphasis to each word in turn')
+    .setDescription(
+      'Repeats a sentence, moving the emphasis to each word in turn')
     .addStringOption(option =>
       option.setName('sentence')
         .setDescription('The sentence to emphasize')

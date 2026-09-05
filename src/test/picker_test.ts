@@ -26,7 +26,9 @@ describe('picker', () => {
     getStringSpy.and.returnValue('A B C');
     getBooleanSpy.and.returnValue(false);
 
-    await picker.execute(mockInteraction as unknown as ChatInputCommandInteraction, null as any);
+    await picker.execute(
+      mockInteraction as unknown as ChatInputCommandInteraction,
+      null as any);
 
     expect(mockReply).toHaveBeenCalledTimes(1);
     const sentMessage = mockReply.calls.mostRecent().args[0];
@@ -38,7 +40,9 @@ describe('picker', () => {
     getStringSpy.and.returnValue('A B C');
     getBooleanSpy.and.returnValue(true);
 
-    await picker.execute(mockInteraction as unknown as ChatInputCommandInteraction, null as any);
+    await picker.execute(
+      mockInteraction as unknown as ChatInputCommandInteraction,
+      null as any);
 
     expect(mockReply).toHaveBeenCalledTimes(1);
     const sentMessage = mockReply.calls.mostRecent().args[0];
@@ -58,9 +62,12 @@ describe('picker', () => {
     getStringSpy.and.returnValue('     ');
     getBooleanSpy.and.returnValue(false);
 
-    await picker.execute(mockInteraction as unknown as ChatInputCommandInteraction, null as any);
+    await picker.execute(
+      mockInteraction as unknown as ChatInputCommandInteraction,
+      null as any);
 
     expect(mockReply).toHaveBeenCalledTimes(1);
-    expect(mockReply.calls.mostRecent().args[0].content).toBe('No options provided!');
+    expect(mockReply.calls.mostRecent().args[0].content)
+      .toBe('No options provided!');
   });
 });
