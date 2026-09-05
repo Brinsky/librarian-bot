@@ -9,6 +9,10 @@ const BLANK_LENGTH = 18;
 // Underlined (via markdown) spaces used for black card blanks
 const BLANK = '__' + ' '.repeat(BLANK_LENGTH) + '__';
 
+// Limits on best-effort draw operations
+const MAX_DRAW_ATTEMPTS_PER_CARD = 5;
+const MAX_DRAW_ATTEMPTS_PER_HAND = 15;
+
 // Only used for parsing from JSON
 interface RawCard {
   id: number;
@@ -18,6 +22,7 @@ interface RawCard {
 interface Deck {
   deckName: string;
   parentSet: string;
+  deckNumber?: number;
   cards: {
     black: RawCard[];
     white: RawCard[];
@@ -28,8 +33,20 @@ interface Card extends RawCard {
   deck: Deck;
 }
 
+interface Hand {
+  renderedBlackCard: string;
+  blackCard: Card;
+  whiteCards: Card[];
+}
+
+interface RenderedBlackCard {
+  renderedBlackCard: string;
+  pickCount: number;
+}
+
 function qualifiedName(deck: Deck): string {
-  return `${deck.parentSet}: ${deck.deckName}`;
+  const deckNumber = deck.deckNumber ? ' ' + deck.deckNumber : '';
+  return `${deck.parentSet}${deckNumber}: ${deck.deckName}`;
 }
 
 /**
@@ -53,11 +70,6 @@ function resolveDecks(rawInput: string, decks: Set<Deck>): Set<Deck> {
   return matched;
 }
 
-interface RenderedBlackCard {
-  renderedBlackCard: string;
-  pickCount: number;
-}
-
 /**
  * Replaces placeholders (e.g. `{1}`) in a black card's text with blanks, and
  * reports how many distinct white cards are needed to fill them. A card with
@@ -76,7 +88,10 @@ function renderBlackCard(text: string): RenderedBlackCard {
   return { renderedBlackCard, pickCount: seen.size || 1 };
 }
 
-const MAX_SAMPLE_ATTEMPTS_PER_CARD = 5;
+function formatSource(card: Card, isBlack: boolean): string {
+  const icon = isBlack ? '◾' : '◽';
+  return `-# *${qualifiedName(card.deck)} (${icon}${card.id})*`;
+}
 
 /** Draws `count` distinct random elements from `pool`. */
 function sampleDistinct<T>(pool: T[], count: number): T[] {
@@ -86,7 +101,7 @@ function sampleDistinct<T>(pool: T[], count: number): T[] {
 
   const usedIndices = new Set<number>();
   const result: T[] = [];
-  const maxAttempts = count * MAX_SAMPLE_ATTEMPTS_PER_CARD;
+  const maxAttempts = count * MAX_DRAW_ATTEMPTS_PER_CARD;
   let attempt = 0;
   while (attempt < maxAttempts && result.length < count) {
     const index = randomInt(0, pool.length);
@@ -104,16 +119,6 @@ function sampleDistinct<T>(pool: T[], count: number): T[] {
   return result;
 }
 
-function formatSource(card: Card): string {
-  return `-# *${qualifiedName(card.deck)}*`;
-}
-
-interface Hand {
-  renderedBlackCard: string;
-  blackCard: Card;
-  whiteCards: Card[];
-}
-
 /** Draws one black card and however many distinct white cards it requires. */
 function drawHand(blackPool: Card[], whitePool: Card[]): Hand {
   const blackCard = blackPool[randomInt(0, blackPool.length)];
@@ -126,8 +131,6 @@ function handIncludesDecks(hand: Hand, decks: Set<Deck>): boolean {
   return decks.has(hand.blackCard.deck) ||
     hand.whiteCards.some(card => decks.has(card.deck));
 }
-
-const MAX_DRAW_ATTEMPTS = 15;
 
 const ALL_FROM_DESCRIPTION =
   'Deck name pattern(s), comma-separated; every card must come from a ' +
@@ -194,7 +197,7 @@ export default class CardsAgainst {
       let hand: Hand | undefined;
       if (oneFromInput) {
         const oneFromDecks = resolveDecks(oneFromInput, this.decks);
-        for (let attempt = 0; attempt < MAX_DRAW_ATTEMPTS && !hand; attempt++) {
+        for (let attempt = 0; attempt < MAX_DRAW_ATTEMPTS_PER_HAND && !hand; attempt++) {
           let candidate: Hand;
           try {
             candidate = drawHand(blackPool, whitePool);
@@ -213,7 +216,7 @@ export default class CardsAgainst {
         if (!hand) {
           throw new ClientError(
             'Couldn\'t find a draw satisfying one_from after ' +
-            `${MAX_DRAW_ATTEMPTS} attempts`);
+            `${MAX_DRAW_ATTEMPTS_PER_HAND} attempts`);
         }
       } else {
         hand = drawHand(blackPool, whitePool);
@@ -223,15 +226,15 @@ export default class CardsAgainst {
 
       const lines: string[] = [];
       lines.push(renderedBlackCard);
-      lines.push(formatSource(blackCard));
+      lines.push(formatSource(blackCard, /* isBlack= */ true));
       lines.push('');
       if (whiteCards.length === 1) {
         lines.push(whiteCards[0].text);
-        lines.push(formatSource(whiteCards[0]));
+        lines.push(formatSource(whiteCards[0], /* isBlack= */ false));
       } else {
         whiteCards.forEach((card, i) => {
           lines.push(`${i + 1}. ${card.text}`);
-          lines.push(`   ${formatSource(card)}`);
+          lines.push(`   ${formatSource(card, /* isBlack= */ false)}`);
         });
       }
 

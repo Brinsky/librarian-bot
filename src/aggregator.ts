@@ -112,7 +112,7 @@ export class Aggregators {
               `${fetchedChannel.guild.id}: ${errMessage}`);
           }
           if (!fetchedChannel.permissionsFor(member)
-              ?.has(PermissionFlagsBits.ViewChannel)) {
+            ?.has(PermissionFlagsBits.ViewChannel)) {
             throw noAccess;
           }
         // DM channels have no permission overwrites to consult; the only user

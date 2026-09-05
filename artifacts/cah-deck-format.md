@@ -33,6 +33,7 @@ One JSON object per file, UTF-8 encoded.
 | Field | Required | Description |
 |---|---|---|
 | `deckName` | yes | Deck/expansion name. |
+| `deckNumber` | no | Ordinal position of the deck within its parent set (e.g. `2` for the second expansion). Can omit when the deck name alone is unambiguous, e.g. a set's `"Base"` deck. |
 | `parentSet` | yes | Name of the parent set, when the deck belongs to a series. |
 | `cards` | yes | Object with `black` and `white` arrays. Either may be empty. |
 
@@ -162,6 +163,7 @@ A conforming deck satisfies all of:
 ```json
 {
   "deckName": "Mini Example",
+  "deckNumber": 2,
   "parentSet": "Cards Against Humanity",
   "cards": {
     "black": [
