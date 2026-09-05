@@ -28,22 +28,52 @@ interface Card extends RawCard {
   deck: Deck;
 }
 
+function qualifiedName(deck: Deck): string {
+  return `${deck.parentSet}: ${deck.deckName}`;
+}
+
+/**
+ * Resolves a comma-separated list of deck name patterns to the set of decks
+ * whose qualified name ("<parentSet>: <deckName>") contains that pattern as a
+ * case-insensitive substring. A single pattern may match several decks (e.g.
+ * "Base" matches every deck named "Base" across all parent sets).
+ */
+function resolveDecks(rawInput: string, decks: Set<Deck>): Set<Deck> {
+  const patterns = rawInput.split(',')
+    .map(s => s.trim().toLowerCase())
+    .filter(s => s.length > 0);
+
+  const matched = new Set<Deck>();
+  for (const deck of decks) {
+    const name = qualifiedName(deck).toLowerCase();
+    if (patterns.some(pattern => name.includes(pattern))) {
+      matched.add(deck);
+    }
+  }
+  return matched;
+}
+
+interface RenderedBlackCard {
+  renderedBlackCard: string;
+  pickCount: number;
+}
+
 /**
  * Replaces placeholders (e.g. `{1}`) in a black card's text with blanks, and
  * reports how many distinct white cards are needed to fill them. A card with
  * no placeholders is a Q&A-style card that still needs exactly one white card
  * appended.
  */
-function renderBlackCard(text: string): { display: string; pickCount: number } {
+function renderBlackCard(text: string): RenderedBlackCard {
   const seen = new Set<number>();
-  const display = text.replace(/\\\{|\{(\d+)\}/g, (match, num) => {
+  const renderedBlackCard = text.replace(/\\\{|\{(\d+)\}/g, (match, num) => {
     if (num === undefined) {
       return '{';
     }
     seen.add(Number(num));
     return BLANK;
   });
-  return { display, pickCount: seen.size || 1 };
+  return { renderedBlackCard, pickCount: seen.size || 1 };
 }
 
 const MAX_SAMPLE_ATTEMPTS_PER_CARD = 5;
@@ -57,26 +87,58 @@ function sampleDistinct<T>(pool: T[], count: number): T[] {
   const usedIndices = new Set<number>();
   const result: T[] = [];
   const maxAttempts = count * MAX_SAMPLE_ATTEMPTS_PER_CARD;
-  for (let attempt = 0; attempt < maxAttempts && result.length < count; attempt++) {
+  let attempt = 0;
+  while (attempt < maxAttempts && result.length < count) {
     const index = randomInt(0, pool.length);
     if (!usedIndices.has(index)) {
       usedIndices.add(index);
       result.push(pool[index]);
     }
+    attempt++;
   }
 
   if (result.length < count) {
-    throw new ClientError(`Failed to draw enough distinct white cards after ${maxAttempts}`);
+    throw new ClientError(
+      `Failed to draw enough distinct white cards after ${maxAttempts}`);
   }
   return result;
 }
 
 function formatSource(card: Card): string {
-  return `-# *${card.deck.parentSet}: ${card.deck.deckName}*`;
+  return `-# *${qualifiedName(card.deck)}*`;
 }
+
+interface Hand {
+  renderedBlackCard: string;
+  blackCard: Card;
+  whiteCards: Card[];
+}
+
+/** Draws one black card and however many distinct white cards it requires. */
+function drawHand(blackPool: Card[], whitePool: Card[]): Hand {
+  const blackCard = blackPool[randomInt(0, blackPool.length)];
+  const { renderedBlackCard, pickCount } = renderBlackCard(blackCard.text);
+  const whiteCards = sampleDistinct(whitePool, pickCount);
+  return { renderedBlackCard, blackCard, whiteCards };
+}
+
+function handIncludesDecks(hand: Hand, decks: Set<Deck>): boolean {
+  return decks.has(hand.blackCard.deck) ||
+    hand.whiteCards.some(card => decks.has(card.deck));
+}
+
+const MAX_DRAW_ATTEMPTS = 15;
+
+const ALL_FROM_DESCRIPTION =
+  'Deck name pattern(s), comma-separated; every card must come from a ' +
+  'matching deck';
+const ONE_FROM_DESCRIPTION =
+  'Deck name pattern(s), comma-separated; at least one card must be ' +
+  'from a matching deck';
 
 /** Loads CAH decks and provides the /cah command for drawing a random hand. */
 export default class CardsAgainst {
+  private readonly decks: Set<Deck> = new Set<Deck>();
   private readonly blackCards: Card[] = [];
   private readonly whiteCards: Card[] = [];
 
@@ -88,6 +150,7 @@ export default class CardsAgainst {
       }
       const deck =
         JSON.parse(fs.readFileSync(`${DECK_DIR}/${file}`).toString()) as Deck;
+      this.decks.add(deck);
       for (const card of deck.cards.black) {
         this.blackCards.push(Object.assign(card, { deck }));
       }
@@ -101,18 +164,65 @@ export default class CardsAgainst {
     data: new SlashCommandBuilder()
       .setName('cah')
       .setDescription(
-        'Draws a random Cards Against Humanity play (black card + white card(s))'),
+        'Draws a random Cards Against Humanity play (black card + ' +
+        'white card(s))')
+      .addStringOption(option =>
+        option.setName('all_from')
+          .setDescription(ALL_FROM_DESCRIPTION)
+          .setRequired(false))
+      .addStringOption(option =>
+        option.setName('one_from')
+          .setDescription(ONE_FROM_DESCRIPTION)
+          .setRequired(false)),
     execute: async (interaction: ChatInputCommandInteraction) => {
-      if (this.blackCards.length === 0 || this.whiteCards.length === 0) {
-        throw new ClientError('No CAH decks are loaded');
+      const allFromInput = interaction.options.getString('all_from');
+      const oneFromInput = interaction.options.getString('one_from');
+
+      const allFromDecks = allFromInput ?
+        resolveDecks(allFromInput, this.decks) : this.decks;
+      const blackPool =
+        this.blackCards.filter(card => allFromDecks.has(card.deck));
+      const whitePool =
+        this.whiteCards.filter(card => allFromDecks.has(card.deck));
+
+      if (blackPool.length === 0 || whitePool.length === 0) {
+        throw new ClientError(allFromInput ?
+          'No cards available for the given filters' :
+          'No CAH decks are loaded');
       }
 
-      const blackCard = this.blackCards[randomInt(0, this.blackCards.length)];
-      const { display, pickCount } = renderBlackCard(blackCard.text);
-      const whiteCards = sampleDistinct(this.whiteCards, pickCount);
+      let hand: Hand | undefined;
+      if (oneFromInput) {
+        const oneFromDecks = resolveDecks(oneFromInput, this.decks);
+        for (let attempt = 0; attempt < MAX_DRAW_ATTEMPTS && !hand; attempt++) {
+          let candidate: Hand;
+          try {
+            candidate = drawHand(blackPool, whitePool);
+          } catch (err) {
+            // Failed to draw enough white cards - possibly by chance;
+            // keep trying.
+            if (!(err instanceof ClientError)) {
+              throw err;
+            }
+            continue;
+          }
+          if (handIncludesDecks(candidate, oneFromDecks)) {
+            hand = candidate;
+          }
+        }
+        if (!hand) {
+          throw new ClientError(
+            'Couldn\'t find a draw satisfying one_from after ' +
+            `${MAX_DRAW_ATTEMPTS} attempts`);
+        }
+      } else {
+        hand = drawHand(blackPool, whitePool);
+      }
+
+      const { renderedBlackCard, blackCard, whiteCards } = hand;
 
       const lines: string[] = [];
-      lines.push(display);
+      lines.push(renderedBlackCard);
       lines.push(formatSource(blackCard));
       lines.push('');
       if (whiteCards.length === 1) {
